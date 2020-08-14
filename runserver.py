@@ -6,9 +6,6 @@ import re
 import threading
 import queue
 
-#server = subprocess.Popen("java -Xmx1024M -Xms1024M -jar server.jar nogui", shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
-#twitch = subprocess.Popen("node twitch_chat.js", shell = True, stdout = subprocess.PIPE)
-
 
 class SimpleProcess(threading.Thread):
   def __init__(self, cmdline):
@@ -57,15 +54,31 @@ minecraft = SimpleProcess("java -Xmx1024M -Xms1024M -jar server.jar nogui")
 stdin = SimpleStdin()
 
 
+# Generic function to run commands (from main window, player chat or Twitch chat)
+def runcmd(user, cmd):
+  print("Running command \"" + cmd + "\" by " + user)
+  if cmd.startswith("server "):
+    minecraft.send(cmd[7:] + "\r\n")
+
+  if cmd.startswith("say "):
+    minecraft.send("say " + cmd[4:] + "\r\n")
+
+  if cmd == "gs":
+    minecraft.send("give " + user + " glowstone\r\n")
+
+
 # Infinite loop
 while True:
 
   ##################### Direct console command stuff ######################
 
   # Get one line from text window (stdin of python program)
-  cmdline = stdin.getline()
-  if cmdline != "":
-    print("Command: " + cmdline)
+  line = stdin.getline()
+
+  # Check that line is not empty
+  if line != "":
+    print("Got cmdline from main window: " + line)
+    runcmd("server", line)
 
 
   ##################### Twitch chat stuff ######################
@@ -73,8 +86,18 @@ while True:
   # Get a single line from the Twitch chat
   line = twitch.getline()
 
+  # Check that line is not empty
   if line != "":
-    minecraft.send("say <Twitch> " + line + "\r\n")
+    print("Got chat line from twitch: " + line)
+
+    # Extract twitch chat info
+    match = re.search("(.*): (.*)$", line)
+    if match:
+      # A chat message was received
+      chatter = "twitch:" + match.group(1)
+      chatmsg = match.group(2)
+
+      minecraft.send("say <" + chatter + "> " + chatmsg + "\r\n")
 
 
   ##################### Server log stuff ######################
@@ -89,12 +112,9 @@ while True:
     # Check if it's a chat message
     match = re.search("<(.*)> (.*)$", line)
     if match:
+      # A chat message was received
       chatter = match.group(1)
       chatmsg = match.group(2)
 
-      if chatmsg.startswith("!server "):
-        print("Server command by " + chatter + ": " + chatmsg[8:])
-        minecraft.send(chatmsg[8:] + "\r\n")
-
-      print(chatter + ": " + chatmsg)
-
+      if chatmsg.startswith("!"):
+        runcmd(chatter, chatmsg[1:])
