@@ -3,23 +3,84 @@
 import subprocess
 import sys
 import re
+import threading
+import queue
 
-server = subprocess.Popen("java -Xmx2048M -Xms2048M -jar server.jar nogui", shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
-twitch = subprocess.Popen("node twitch_chat.js", shell = True, stdout = subprocess.PIPE)
+#server = subprocess.Popen("java -Xmx1024M -Xms1024M -jar server.jar nogui", shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
+#twitch = subprocess.Popen("node twitch_chat.js", shell = True, stdout = subprocess.PIPE)
 
+
+class SimpleProcess(threading.Thread):
+  def __init__(self, cmdline):
+    threading.Thread.__init__(self)
+    self.queue = queue.Queue()
+    self.program = subprocess.Popen(cmdline, shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
+    self.start()
+
+  def run(self):
+    while True:
+      line = self.program.stdout.readline().decode("utf-8")[:-1]
+      self.queue.put(line)
+
+  def getline(self):
+    try:
+      return self.queue.get(block = False)
+    except:
+      return ""
+
+  def send(self, line):
+    self.program.stdin.write(bytes(line, "utf-8"))
+    self.program.stdin.flush()
+
+
+
+class SimpleStdin(threading.Thread):
+  def __init__(self):
+    threading.Thread.__init__(self)
+    self.queue = queue.Queue()
+    self.start()
+
+  def run(self):
+    while True:
+      line = sys.stdin.readline()[:-1]
+      self.queue.put(line)
+
+  def getline(self):
+    try:
+      return self.queue.get(block = False)
+    except:
+      return ""
+
+
+twitch = SimpleProcess("node twitch_chat.js")
+minecraft = SimpleProcess("java -Xmx1024M -Xms1024M -jar server.jar nogui")
+stdin = SimpleStdin()
+
+
+# Infinite loop
 while True:
-#  cmdline = sys.stdin.readline()[:-1]
-#  print("Command: " + cmdline)
+
+  ##################### Direct console command stuff ######################
+
+  # Get one line from text window (stdin of python program)
+  cmdline = stdin.getline()
+  if cmdline != "":
+    print("Command: " + cmdline)
+
+
+  ##################### Twitch chat stuff ######################
 
   # Get a single line from the Twitch chat
-  line = twitch.stdout.readline().decode("utf-8")[:-1]
+  line = twitch.getline()
 
   if line != "":
-    server.stdin.write(bytes("say <Twitch> " + line + "\r\n", "utf-8"))
-    server.stdin.flush()    
+    minecraft.send("say <Twitch> " + line + "\r\n")
+
+
+  ##################### Server log stuff ######################
 
   # Get a single line from the Minecraft server
-  line = server.stdout.readline().decode("utf-8")[:-1]
+  line = minecraft.getline()
 
   # Check that line is not empty
   if line != "":
@@ -33,13 +94,7 @@ while True:
 
       if chatmsg.startswith("!server "):
         print("Server command by " + chatter + ": " + chatmsg[8:])
-        server.stdin.write(bytes(chatmsg[8:] + "\r\n", "utf-8"))
-        server.stdin.flush()
-
-# <Hexchild> Something I said
+        minecraft.send(chatmsg[8:] + "\r\n")
 
       print(chatter + ": " + chatmsg)
 
-
-
-#      server.stdin.write(bytes("say foo\r", "utf-8"))
