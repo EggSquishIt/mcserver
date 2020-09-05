@@ -92,23 +92,38 @@ def saveconfig():
 def getuser_byuuid(uuid):
   if uuid not in users:
     users[uuid] = {}
+
+  users[uuid]["id"] = uuid
   return users[uuid]
 
 # Obtain the userinfo structure for a user based on their username
 def getuser_byname(username):
   if username not in usernames:
-    userinfo = getuser_byuuid(username)
+    uuid = username
   else:
-    userinfo = getuser_byuuid(usernames[username])
+    uuid = usernames[username]
+
+  userinfo = getuser_byuuid(uuid)
 
   # Hack to ensure that returnname is present in userinfo
   if "username" not in userinfo:
     userinfo["username"] = username
+
   return userinfo
+
+# Return the correct ID for a user
+def getuuid(userinfo):
+  if "id" in userinfo:
+    return userinfo["id"]
+
+  return userinfo["username"]
 
 def getuserstanding(userinfo):
   if "standing" in userinfo:
     return userinfo["standing"]
+
+  if userinfo["username"].startswith("twitch:"):
+    return 10000
 
   return 0
 
@@ -117,29 +132,62 @@ def getuserstanding_byname(username):
 
 
 def reward(userinfo, rewardinfo):
-  minecraft.send("say Thank you, " + userinfo["username"] + "\r\n")
+  minecraft.send("say The gods are pleased with " + userinfo["username"] + "\r\n")
   minecraft.send("give " + userinfo["username"] + " iron_ingot 64\r\n")
 
 def punish(userinfo, punishmentinfo):
-  minecraft.send("say That's not very nice, " + userinfo["username"] + "\r\n")
-  #minecraft.send("execute as @e at @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt\r\n")
-  #minecraft.send("execute as @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt {display:{color:#de0000}}\r\n")
-  #minecraft.send("execute as @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:creeper\r\n")
+  minecraft.send("say The gods are not happy with " + userinfo["username"] + "\r\n")
+
+  if punishmentinfo["level"] >= 100:
+    minecraft.send("execute as @e at @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt {display:{color:#de0000}}\r\n")
+    return
+
+  if punishmentinfo["level"] >= 50:
+    minecraft.send("execute at @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt {display:{color:#de0000}}\r\n")
+    return
+
+  minecraft.send("execute as @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:creeper\r\n")
+
+def check_permissions(userinfo, requirements):
+  if "admin" in userinfo:
+    return True
+
+  if "minimum_standing" in requirements:
+    if getuserstanding(userinfo) < requirements["minimum_standing"]:
+      return False
+
+  return True
 
 def is_allowed(userinfo, requirements, reason):
   print("Permissions check for: " + str(userinfo))
   print("Requirements: " + str(requirements))
   print("Reason: " + str(reason))
 
-  if "minimum_standing" in requirements:
-    if getuserstanding(userinfo) >= requirements["minimum_standing"]:
-      return True
+  if not check_permissions(userinfo, requirements):
+    print("Punishing " + userinfo["username"] + " for " + str(reason) + " without permission")
+    punish(userinfo, {
+      "reason": reason,
+      "level": 1
+    })
+    return False
 
-  punish(userinfo, {
-    "reason": reason,
-    "level": 1
-  })
-  return False
+  return True
+
+# Send an abritrary message to the server, a player or a Twitch chatter
+def message(userinfo, msg):
+  if getuuid(userinfo) == "server":
+    print(msg)
+    return
+
+  # What to add before each line
+#  prefix = "tell " + userinfo["username"] + " "
+  prefix = "say " + userinfo["username"] + " "
+  # What to add after each line
+  suffix = "\r\n"
+  # What to add between lines
+  midfix = suffix + prefix
+  minecraft.send(prefix + midfix.join(msg.split("\n")) + suffix)
+
 
 def cmd_reward(userinfo, args):
   if is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + args):
@@ -171,7 +219,8 @@ def cmd_server(userinfo, args):
     minecraft.send(args + "\r\n")
 
 def cmd_say(userinfo, args):
-  minecraft.send("say " + args + "\r\n")
+  if is_allowed(userinfo, { "minimum_standing": 0 }, "Trying to make the server speak"):
+    minecraft.send("say " + args + "\r\n")
 
 def cmd_gs(userinfo, args):
   if args == "":
@@ -183,38 +232,85 @@ def cmd_gs(userinfo, args):
     minecraft.send("give " + targetname + " glowstone\r\n")
 
 def cmd_give(userinfo, args):
-  match = re.search("^([^ ]*) (.*)$", args)
-  if match:
-    who = match.group(1)
-    what = match.group(2)
+  if is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give " + args + " to " + targetname):
+    match = re.search("^([^ ]*) (.*)$", args)
+    if match:
+      who = match.group(1)
+      what = match.group(2)
 
-    minecraft.send("give " + who + " " + what + "\r\n")
+      minecraft.send("give " + who + " " + what + "\r\n")
 
+def cmd_help(userinfo, args):
+  if args == "":
+    message(userinfo, "Available commands:" + " ".join(cmds))
+  else:
+    message(userinfo, cmds[args]["help"])
 
 cmds = {
   "standing": {
-    "handler": cmd_standing
+    "handler": cmd_standing,
+    "help": """
+!standing
+!standing <player>
+Respond with the current standing of yourself or a given player.
+"""
   },
   "reward": {
-    "handler": cmd_reward
+    "handler": cmd_reward,
+    "help": """
+!reward <player>
+Reward a player.
+"""
   },
   "punish": {
-    "handler": cmd_punish
+    "handler": cmd_punish,
+    "help": """
+!punish <player>
+Punish a player.
+"""
   },
   "save": {
-    "handler": cmd_save
+    "handler": cmd_save,
+    "help": """
+!save
+Save the current script state.
+"""
   },
   "server": {
-    "handler": cmd_server
-  },
+    "handler": cmd_server,
+    "help": """
+!server <command>
+Run an arbitrary server command.
+"""  },
   "say": {
-    "handler": cmd_say
+    "handler": cmd_say,
+    "help": """
+!say <message>
+Have the server speak.
+"""
   },
   "gs": {
-    "handler": cmd_gs
+    "handler": cmd_gs,
+    "help": """
+!gs
+!gs <player>
+Gives glowstone to you or another player.
+"""
   },
   "give": {
-    "handler": cmd_give
+    "handler": cmd_give,
+    "help": """
+!give <player> <item>
+Gives an arbitrary item to another player.
+"""
+  },
+  "help": {
+    "handler": cmd_help,
+    "help": """
+!help
+!help <command>
+Provides a list of commands, or help on a specific command.
+"""
   }
 }
 
@@ -296,5 +392,6 @@ while True:
       uuid = match.group(2)
 
       usernames[username] = uuid
+      getuser_byname(username)
 
 # [15:31:59] [User Authenticator #1/INFO]: UUID of player Hexchild is 05a96b16-9845-44b7-8af9-6e9976d81035
