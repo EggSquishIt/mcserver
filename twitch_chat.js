@@ -30,17 +30,20 @@ fs.readFile("twitch_identity.json", "utf8", function(err, data) {
 	con.on("line", function(line) {
 		var re = /^([^ ]*) ([^ ]*) (.*)$/
 		var match = line.match(re);
-		var cmd = match[1];
-		var target = match[2];
-		var msg = match[3];
+		try {
+			var cmd = match[1];
+			var target = match[2];
+			var msg = match[3];
 
-		switch(cmd) {
-			case "say":
-				client.say(target, msg);
-				break;
-			case "whisper":
-				client.whisper(target, msg);
-				break;
+			switch(cmd) {
+				case "say":
+					client.say(target, msg);
+					break;
+				case "whisper":
+					client.whisper(target, msg);
+					break;
+			}
+		} catch(e) {
 		}
 	});
 
