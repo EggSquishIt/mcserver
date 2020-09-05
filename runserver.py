@@ -7,6 +7,7 @@ import threading
 import queue
 import os
 import json
+import time
 
 # A hack to remove the session lock from any previously running server instance
 try:
@@ -122,8 +123,8 @@ def getuserstanding(userinfo):
   if "standing" in userinfo:
     return userinfo["standing"]
 
-  if userinfo["username"].startswith("twitch:"):
-    return 10000
+  #if getchattype(userinfo) == "twitch":
+  #  return 10000
 
   return 0
 
@@ -173,20 +174,76 @@ def is_allowed(userinfo, requirements, reason):
 
   return True
 
-# Send an abritrary message to the server, a player or a Twitch chatter
-def message(userinfo, msg):
+# Check the source type (minecraft player, server input or twitch) for a userinfo
+def getchattype(userinfo):
   if getuuid(userinfo) == "server":
-    print(msg)
+    return "server"
+
+  if getuuid(userinfo).startswith("twitch:"):
+    return "twitch"
+
+  return "minecraft"
+
+# Send message to server's text output
+def server_message(msg):
+  print(msg)
+
+twitch_messages = []
+# Send message to Twitch chat
+def twitch_message(msg):
+  global twitch_messages
+
+  for line in msg.split("\n"):
+    twitch_messages.append(line)
+
+twitch_lastmsg = time.time()
+# Do twitch chat throttling
+def twitch_message_update():
+  global twitch_messages
+  global twitch_lastmsg
+
+  if len(twitch_messages) == 0:
     return
 
+  if len(twitch_messages) > 10:
+    twitch_messages.pop(0)
+    return
+
+  now = time.time()
+  if (now - twitch_lastmsg) < 2:
+    return
+
+  twitch_lastmsg = now
+
+  msg = twitch_messages.pop(0)
+  twitch.send("say EggSquishIt " + msg + "\n")
+
+# Send message to Minecraft players
+def minecraft_message(msg):
   # What to add before each line
-#  prefix = "tell " + userinfo["username"] + " "
-  prefix = "say " + userinfo["username"] + " "
+  # prefix = "tell " + userinfo["username"] + " "
+  prefix = "say "
   # What to add after each line
   suffix = "\r\n"
   # What to add between lines
   midfix = suffix + prefix
   minecraft.send(prefix + midfix.join(msg.split("\n")) + suffix)
+
+
+# Send an abritrary message to the specified user
+def message(userinfo, msg):
+  chattype = getchattype(userinfo)
+
+  if chattype == "server":
+    server_message(msg)
+    return
+
+  if chattype == "twitch":
+    twitch_message(msg)
+    return
+
+  if chattype == "minecraft":
+    minecraft_message(msg)
 
 
 def cmd_reward(userinfo, args):
@@ -209,7 +266,7 @@ def cmd_standing(userinfo, args):
   else:
     targetname = args
 
-  minecraft.send("say User " + targetname + " has standing " + str(getuserstanding_byname(targetname)) + "\r\n")
+  message(userinfo, "User " + targetname + " has standing " + str(getuserstanding_byname(targetname)) + "\r\n")
 
 def cmd_save(userinfo, args):
   saveconfig()
@@ -221,6 +278,11 @@ def cmd_server(userinfo, args):
 def cmd_say(userinfo, args):
   if is_allowed(userinfo, { "minimum_standing": 0 }, "Trying to make the server speak"):
     minecraft.send("say " + args + "\r\n")
+
+def cmd_twitch_say(userinfo, args):
+  if "admin" in userinfo and userinfo["admin"]:
+    print("Saying message as twitch bot: " + args)
+    twitch.send("say EggSquishIt " + args + "\n")
 
 def cmd_gs(userinfo, args):
   if args == "":
@@ -287,6 +349,13 @@ Run an arbitrary server command.
     "help": """
 !say <message>
 Have the server speak.
+"""
+  },
+  "twitch_say": {
+    "handler": cmd_twitch_say,
+    "help": """
+!twitch_say <message>
+Have the twitch bot speak.
 """
   },
   "gs": {
@@ -393,5 +462,8 @@ while True:
 
       usernames[username] = uuid
       getuser_byname(username)
+
+  # Make sure twitch messages that have been throttled get sent
+  twitch_message_update()
 
 # [15:31:59] [User Authenticator #1/INFO]: UUID of player Hexchild is 05a96b16-9845-44b7-8af9-6e9976d81035
