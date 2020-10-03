@@ -1,13 +1,15 @@
 
 # Some modules we need to use
-import subprocess
-import sys
 import re
-import threading
-import queue
 import os
-import json
-import time
+import simpleprocess
+import users
+import rewards
+import permissions
+import externals
+import minecraft
+import regexhandling
+import gods
 
 # A hack to remove the session lock from any previously running server instance
 try:
@@ -15,392 +17,555 @@ try:
 except:
   pass
 
-class SimpleProcess(threading.Thread):
-  def __init__(self, cmdline):
-    threading.Thread.__init__(self)
-    self.queue = queue.Queue()
-    self.program = subprocess.Popen(cmdline, shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
-    self.start()
-
-  def run(self):
-    while True:
-      line = self.program.stdout.readline().decode("utf-8")[:-1]
-      self.queue.put(line)
-
-  def getline(self):
-    try:
-      return self.queue.get(block = False)
-    except:
-      return ""
-
-  def send(self, line):
-    self.program.stdin.write(bytes(line, "utf-8"))
-    self.program.stdin.flush()
-
-
-
-class SimpleStdin(threading.Thread):
-  def __init__(self):
-    threading.Thread.__init__(self)
-    self.queue = queue.Queue()
-    self.start()
-
-  def run(self):
-    while True:
-      line = sys.stdin.readline()[:-1]
-      self.queue.put(line)
-
-  def getline(self):
-    try:
-      return self.queue.get(block = False)
-    except:
-      return ""
-
-
-twitch = SimpleProcess("node twitch_chat.js")
-minecraft = SimpleProcess("java -Xmx1024M -Xms1024M -jar server.jar nogui")
-stdin = SimpleStdin()
-
-# General userinfo structure:
-#
-# usernames = {
-#   "Hexchild": "05a96b16-9845-44b7-8af9-6e9976d81035"
-# }
-#
-# users = {
-#   "05a96b16-9845-44b7-8af9-6e9976d81035": {
-#     "username": "Hexchild",
-#     "standing": "good",
-#     "cash": "1000000000"
-#   }
-# }
-#
-usernames = {}
-users = {}
-
-try:
-  with open("users.json", "r") as f:
-    users = json.loads(f.read())
-except:
-  pass
+externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
+externals.minecraft = minecraft.Server("java -Xmx1024M -Xms1024M -jar server.jar nogui")
+externals.stdin = simpleprocess.SimpleStdin()
 
 # Function to store the python script's state
 def saveconfig():
-  with open("users.json", "w") as f:
-    f.write(json.dumps(users, indent = 2) + "\n")
+  users.saveconfig()
 
-# Obtain the userinfo structure for a user based on their ID
-def getuser_byuuid(uuid):
-  if uuid not in users:
-    users[uuid] = {}
+def cmd_wrong_params(match, entry, userinfo):
+  users.message(userinfo, "Incorrect usage of command")
+  return True # No more processing from command list
 
-  users[uuid]["id"] = uuid
-  return users[uuid]
+cmd_rlist = []
+help_map = {}
 
-# Obtain the userinfo structure for a user based on their username
-def getuser_byname(username):
-  if username not in usernames:
-    uuid = username
-  else:
-    uuid = usernames[username]
+####### summon command #######
 
-  userinfo = getuser_byuuid(uuid)
+def cmd_summon(match, entry, userinfo):
+  entity_type = match.group(1)
+  externals.minecraft.summon(entity_type)
+  return True # No more processing from command list
 
-  # Hack to ensure that returnname is present in userinfo
-  if "username" not in userinfo:
-    userinfo["username"] = username
+def cmd_summon_with_position(match, entry, userinfo):
+  entity_type = match.group(1)
+  position = match.group(2)
+  externals.minecraft.summon(entity_type, position)
+  return True # No more processing from command list
 
-  return userinfo
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^summon ([^ ]*)$",
+    "handler": cmd_summon,
+  },
+  {
+    "regex": "^summon ([^ ]*) (.*)$",
+    "handler": cmd_summon_with_position,
+  },
+  {
+    "regex": "^summon$",
+    "handler": cmd_wrong_params,
+  },
+]
 
-# Return the correct ID for a user
-def getuuid(userinfo):
-  if "id" in userinfo:
-    return userinfo["id"]
+help_map["summon"] = {
+  "help": """
+!summon <entity_type>
+!summon <entity_type> <position>
+Summons an entity.
+"""
+}
 
-  return userinfo["username"]
+####### ominous command #######
 
-def getuserstanding(userinfo):
-  if "standing" in userinfo:
-    return userinfo["standing"]
+def cmd_ominous(match, entry, userinfo):
+  externals.minecraft.send("execute as @p run summon lightning_bolt ~ ~512 ~\r\n")
+  return True # No more processing from command list
 
-  #if getchattype(userinfo) == "twitch":
-  #  return 10000
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^ominous$",
+    "handler": cmd_ominous,
+  },
+]
 
-  return 0
+help_map["ominous"] = {
+  "help": """
+!ominous
+Just do it!
+"""
+}
 
-def getuserstanding_byname(username):
-  return getuserstanding(getuser_byname(username))
+# execute as @p run summon lightning_bolt ~ ~512 ~
 
+####### godmood command #######
 
-def reward(userinfo, rewardinfo):
-  minecraft.send("say The gods are pleased with " + userinfo["username"] + "\r\n")
-  minecraft.send("give " + userinfo["username"] + " iron_ingot 64\r\n")
+def cmd_godmood_set(match, entry, userinfo):
+  #if "admin" in userinfo and userinfo["admin"]:
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to set godmood"):
+    newmood = match.group(1)
+    try:
+      gods.mood = float(newmood)
+    except:
+      pass
 
-def punish(userinfo, punishmentinfo):
-  minecraft.send("say The gods are not happy with " + userinfo["username"] + "\r\n")
+  return True # No more processing from command list
 
-  if punishmentinfo["level"] >= 100:
-    minecraft.send("execute as @e at @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt {display:{color:#de0000}}\r\n")
-    return
+def cmd_godmood_report(match, entry, userinfo):
+  users.message(userinfo, "The gods are currently " + gods.describe_mood(gods.mood))
+  return True # No more processing from command list
 
-  if punishmentinfo["level"] >= 50:
-    minecraft.send("execute at @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:lightning_bolt {display:{color:#de0000}}\r\n")
-    return
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^godmood (.*)$",
+    "handler": cmd_godmood_set,
+  },
+  {
+    "regex": "^godmood$",
+    "handler": cmd_godmood_report,
+  },
+]
 
-  minecraft.send("execute as @e[name=\"" + userinfo["username"] + "\"] run summon minecraft:creeper\r\n")
+help_map["godmood"] = {
+  "help": """
+!godmood <number>
+!godmood
+Set or report the current mood of the gods.
+"""
+}
 
-def check_permissions(userinfo, requirements):
-  if "admin" in userinfo:
-    return True
+####### reward command #######
 
-  if "minimum_standing" in requirements:
-    if getuserstanding(userinfo) < requirements["minimum_standing"]:
-      return False
-
-  return True
-
-def is_allowed(userinfo, requirements, reason):
-  print("Permissions check for: " + str(userinfo))
-  print("Requirements: " + str(requirements))
-  print("Reason: " + str(reason))
-
-  if not check_permissions(userinfo, requirements):
-    print("Punishing " + userinfo["username"] + " for " + str(reason) + " without permission")
-    punish(userinfo, {
-      "reason": reason,
-      "level": 1
-    })
-    return False
-
-  return True
-
-# Check the source type (minecraft player, server input or twitch) for a userinfo
-def getchattype(userinfo):
-  if getuuid(userinfo) == "server":
-    return "server"
-
-  if getuuid(userinfo).startswith("twitch:"):
-    return "twitch"
-
-  return "minecraft"
-
-# Send message to server's text output
-def server_message(msg):
-  print(msg)
-
-twitch_messages = []
-# Send message to Twitch chat
-def twitch_message(msg):
-  global twitch_messages
-
-  for line in msg.split("\n"):
-    twitch_messages.append(line)
-
-twitch_lastmsg = time.time()
-# Do twitch chat throttling
-def twitch_message_update():
-  global twitch_messages
-  global twitch_lastmsg
-
-  if len(twitch_messages) == 0:
-    return
-
-  if len(twitch_messages) > 10:
-    twitch_messages.pop(0)
-    return
-
-  now = time.time()
-  if (now - twitch_lastmsg) < 2:
-    return
-
-  twitch_lastmsg = now
-
-  msg = twitch_messages.pop(0)
-  twitch.send("say EggSquishIt " + msg + "\n")
-
-# Send message to Minecraft players
-def minecraft_message(msg):
-  # What to add before each line
-  # prefix = "tell " + userinfo["username"] + " "
-  prefix = "say "
-  # What to add after each line
-  suffix = "\r\n"
-  # What to add between lines
-  midfix = suffix + prefix
-  minecraft.send(prefix + midfix.join(msg.split("\n")) + suffix)
-
-
-# Send an abritrary message to the specified user
-def message(userinfo, msg):
-  chattype = getchattype(userinfo)
-
-  if chattype == "server":
-    server_message(msg)
-    return
-
-  if chattype == "twitch":
-    twitch_message(msg)
-    return
-
-  if chattype == "minecraft":
-    minecraft_message(msg)
-
-
-def cmd_reward(userinfo, args):
-  if is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + args):
-    reward(getuser_byname(args), {
+def cmd_reward(match, entry, userinfo):
+  targetname = match.group(1)
+  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+    rewards.reward(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": 1
     })
+  return True # No more processing from command list
 
-def cmd_punish(userinfo, args):
-  if is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + args):
-    punish(getuser_byname(args), {
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^reward (.*)$",
+    "handler": cmd_reward,
+  },
+  {
+    "regex": "^reward$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["reward"] = {
+  "help": """
+!reward <player>
+Reward a player.
+"""
+}
+
+####### punish command #######
+
+def cmd_punish(match, entry, userinfo):
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + args):
+    targetname = match.group(1)
+    rewards.punish(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": 1
     })
+  return True # No more processing from command list
 
-def cmd_standing(userinfo, args):
-  if args == "":
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^punish (.*)$",
+    "handler": cmd_punish,
+  },
+  {
+    "regex": "^punish$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["punish"] = {
+  "help": """
+!punish <player>
+Punish a player.
+"""
+}
+
+####### standing command #######
+
+def cmd_standing(match, entry, userinfo):
+  if len(match.groups()) == 0:
     targetname = userinfo["username"]
   else:
-    targetname = args
+    targetname = match.group(1)
 
-  message(userinfo, "User " + targetname + " has standing " + str(getuserstanding_byname(targetname)) + "\r\n")
+  users.message(userinfo, "User " + targetname + " has standing " + str(users.getuserstanding_byname(targetname)) + "\r\n")
+  return True # No more processing from command list
 
-def cmd_save(userinfo, args):
-  saveconfig()
-
-def cmd_server(userinfo, args):
-  if "admin" in userinfo and userinfo["admin"]:
-    minecraft.send(args + "\r\n")
-
-def cmd_say(userinfo, args):
-  if is_allowed(userinfo, { "minimum_standing": 0 }, "Trying to make the server speak"):
-    minecraft.send("say " + args + "\r\n")
-
-def cmd_twitch_say(userinfo, args):
-  if "admin" in userinfo and userinfo["admin"]:
-    print("Saying message as twitch bot: " + args)
-    twitch.send("say EggSquishIt " + args + "\n")
-
-def cmd_gs(userinfo, args):
-  if args == "":
-    targetname = userinfo["username"]
-  else:
-    targetname = args
-
-  if is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give glowstone to " + targetname):
-    minecraft.send("give " + targetname + " glowstone\r\n")
-
-def cmd_give(userinfo, args):
-  if is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give " + args + " to " + targetname):
-    match = re.search("^([^ ]*) (.*)$", args)
-    if match:
-      who = match.group(1)
-      what = match.group(2)
-
-      minecraft.send("give " + who + " " + what + "\r\n")
-
-def cmd_help(userinfo, args):
-  if args == "":
-    message(userinfo, "Available commands:" + " ".join(cmds))
-  else:
-    message(userinfo, cmds[args]["help"])
-
-cmds = {
-  "standing": {
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^standing (.*)$",
     "handler": cmd_standing,
-    "help": """
+  },
+  {
+    "regex": "^standing$",
+    "handler": cmd_standing,
+  },
+]
+
+help_map["standing"] = {
+  "help": """
 !standing
 !standing <player>
 Respond with the current standing of yourself or a given player.
 """
-  },
-  "reward": {
-    "handler": cmd_reward,
-    "help": """
-!reward <player>
-Reward a player.
-"""
-  },
-  "punish": {
-    "handler": cmd_punish,
-    "help": """
-!punish <player>
-Punish a player.
-"""
-  },
-  "save": {
+}
+
+####### save command #######
+
+def cmd_save(match, entry, userinfo):
+  saveconfig()
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^save$",
     "handler": cmd_save,
-    "help": """
+  },
+  {
+    "regex": "^save ",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["save"] = {
+  "help": """
 !save
 Save the current script state.
 """
-  },
-  "server": {
+}
+
+####### server command #######
+
+def cmd_server(match, entry, userinfo):
+  if "admin" in userinfo and userinfo["admin"]:
+    cmd = match.group(1)
+    externals.minecraft.send(cmd + "\r\n")
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^server (.*)$",
     "handler": cmd_server,
-    "help": """
-!server <command>
-Run an arbitrary server command.
-"""  },
-  "say": {
+  },
+  {
+    "regex": "^server$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["server"] = {
+  "help": """
+#!server <command>
+#Run an arbitrary server command.
+#"""
+}
+
+####### title command #######
+
+def cmd_title(match, entry, userinfo):
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to make a title"):
+    msg = match.group(1)
+    externals.minecraft.title(msg)
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^title (.*)$",
+    "handler": cmd_title,
+  },
+  {
+    "regex": "^title$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["title"] = {
+  "help": """
+!title <message>
+Show a title to all players.
+"""
+}
+
+####### say command #######
+
+def cmd_say(match, entry, userinfo):
+  if permissions.is_allowed(userinfo, { "minimum_standing": 0 }, "Trying to make the server speak"):
+    msg = match.group(1)
+    externals.minecraft.say(msg)
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^say (.*)$",
     "handler": cmd_say,
-    "help": """
+  },
+  {
+    "regex": "^say$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["say"] = {
+  "help": """
 !say <message>
 Have the server speak.
 """
-  },
-  "twitch_say": {
+}
+
+####### twitch_say command #######
+
+def cmd_twitch_say(match, entry, userinfo):
+  if "admin" in userinfo and userinfo["admin"]:
+    msg = match.group(1)
+    externals.twitch.send("say EggSquishIt " + msg + "\n")
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^twitch_say (.*)$",
     "handler": cmd_twitch_say,
-    "help": """
+  },
+  {
+    "regex": "^twitch_say$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["twitch_say"] = {
+  "help": """
 !twitch_say <message>
 Have the twitch bot speak.
 """
-  },
-  "gs": {
+}
+
+####### gs command #######
+
+def cmd_gs(match, entry, userinfo):
+  print("Got " + str(len(match.groups())) + " groups.")
+  if len(match.groups()) == 0:
+    targetname = userinfo["username"]
+  else:
+    targetname = match.group(1)
+
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give glowstone to " + targetname):
+    externals.minecraft.send("give " + targetname + " glowstone\r\n")
+
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^gs$",
     "handler": cmd_gs,
-    "help": """
+  },
+  {
+    "regex": "^gs (.*)$",
+    "handler": cmd_gs,
+  },
+]
+
+help_map["gs"] = {
+  "help": """
 !gs
 !gs <player>
 Gives glowstone to you or another player.
 """
-  },
-  "give": {
+}
+
+####### give command #######
+
+def cmd_give(match, entry, userinfo):
+  who = match.group(1)
+  what = match.group(2)
+
+  if not permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give " + what + " to " + who):
+    return True # No more processing from command list
+
+  externals.minecraft.send("give " + who + " " + what + "\r\n")
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^give ([^ ]+) (.*)$",
     "handler": cmd_give,
-    "help": """
+  },
+  {
+    "regex": "^give($| )",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["give"] = {
+  "help": """
 !give <player> <item>
 Gives an arbitrary item to another player.
 """
-  },
-  "help": {
+}
+
+####### help command #######
+
+def cmd_help(match, entry, userinfo):
+  if len(match.groups()) == 0:
+    users.message(userinfo, "Available commands: " + " ".join(help_map))
+  else:
+    cmd = match.group(1)
+    if cmd in help_map:
+      users.message(userinfo, help_map[cmd]["help"])
+    else:
+      users.message(userinfo, "Unknown command \"" + cmd + "\"")
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^help (.*)$",
     "handler": cmd_help,
-    "help": """
+  },
+  {
+    "regex": "^help$",
+    "handler": cmd_help,
+  },
+]
+
+help_map["help"] = {
+  "help": """
 !help
 !help <command>
 Provides a list of commands, or help on a specific command.
 """
-  }
 }
 
+####### twitch chat but not opted in #######
 
-# Generic function to run commands (from main window, player chat or Twitch chat)
+def cmd_optout(match, entry, userinfo):
+  if "optin" in userinfo:
+    del userinfo["optin"]
+    saveconfig()
+    users.message(userinfo, userinfo["username"] + ", you have now opted out of being part of the experiment.")
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^optout$",
+    "handler": cmd_optout,
+  }
+]
+
+###################################
+
 def runcmd(userinfo, cmd):
   print("Running command \"" + cmd + "\" by " + userinfo["username"])
   print("User info: " + str(userinfo))
 
-  match = re.search("^([^ ]*) (.*)$", cmd)
-  if match:
-    cmd = match.group(1)
-    args = match.group(2)
+  if regexhandling.handle_rlist(cmd, cmd_rlist, userinfo) == 0:
+    users.message(userinfo, "Unknown command")
+
+
+twitchonly_rlist = []
+
+####### twitch chat but not opted in #######
+
+def twitchonly_optin(match, entry, userinfo):
+  userinfo["optin"] = True
+  saveconfig()
+  users.message(userinfo, userinfo["username"] + ", you have now opted in to being part of the experiment.")
+  users.message(userinfo, "Your chat will now appear on the Minecraft server and potentially other places.")
+  users.message(userinfo, "You now have access to a bunch of commands. Try !help")
+  users.message(userinfo, "You can opt out of this by typing !optout")
+
+twitchonly_rlist = twitchonly_rlist + [
+  {
+    "regex": "^!optin$",
+    "handler": twitchonly_optin,
+  }
+]
+
+###################################
+
+
+twitch_rlist = []
+
+####### twitch chat #######
+
+def twitch_chat_message(match, entry, unused):
+  # A chat message was received
+  chatter = "twitch:" + match.group(1)
+  chatmsg = match.group(2)
+
+  userinfo = users.getuser_byname(chatter)
+
+  if "optin" in userinfo and userinfo["optin"]:
+    print("<" + chatter + "> " + chatmsg)
+
+    if chatmsg.startswith("!"):
+      runcmd(userinfo, chatmsg[1:])
+
+    externals.minecraft.say("<" + chatter + "> " + chatmsg)
+
   else:
-    args = ""
+    regexhandling.handle_rlist(chatmsg, twitchonly_rlist, userinfo)
 
-  try:
-    cmds[cmd]["handler"](userinfo, args)
-  except KeyError:
-    pass
 
+twitch_rlist = twitch_rlist + [
+  {
+    "regex": "^(.*): (.*)$",
+    "handler": twitch_chat_message,
+  }
+]
+
+###################################
+
+
+
+server_rlist = []
+
+####### current time of day #######
+
+def server_the_time_is(match, entry, unused):
+  externals.minecraft.daytime = int(match.group(1))
+
+server_rlist = server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: The time is ([0-9]+)$",
+    "handler": server_the_time_is,
+  }
+]
+
+####### player chat #######
+
+def server_chat_message(match, entry, unused):
+  # A chat message was received
+  chatter = match.group(1)
+  chatmsg = match.group(2)
+  print("<" + chatter + "> " + chatmsg)
+
+  if chatmsg.startswith("!"):
+    runcmd(users.getuser_byname(chatter), chatmsg[1:])
+
+server_rlist = server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: <(.*)> (.*)$",
+    "handler": server_chat_message,
+  }
+]
+
+####### map between between player name and UUID #######
+
+def server_uuid_map(match, entry, unused):
+  username = match.group(1)
+  uuid = match.group(2)
+  
+  users.setuuid_byname(username, uuid)
+  users.getuser_byname(username)
+
+server_rlist = server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[User Authenticator #[0-9]*/INFO\\]: UUID of player ([^ ]*) is ([0-9a-f-]*)$",
+    "handler": server_uuid_map,
+  }
+]
+
+###################################
 
 # Infinite loop
 while True:
@@ -408,62 +573,35 @@ while True:
   ##################### Direct console command stuff ######################
 
   # Get one line from text window (stdin of python program)
-  line = stdin.getline()
+  line = externals.stdin.getline()
 
   # Check that line is not empty
   if line != "":
     print("Got cmdline from main window: " + line)
-    runcmd(getuser_byname("server"), line)
+    runcmd(users.getuser_byname("server"), line)
 
 
   ##################### Twitch chat stuff ######################
 
   # Get a single line from the Twitch chat
-  line = twitch.getline()
+  line = externals.twitch.getline()
 
   # Check that line is not empty
   if line != "":
-    print("Got chat line from twitch: " + line)
-
-    # Extract twitch chat info
-    match = re.search("^(.*): (.*)$", line)
-    if match:
-      # A chat message was received
-      chatter = "twitch:" + match.group(1)
-      chatmsg = match.group(2)
-
-      minecraft.send("say <" + chatter + "> " + chatmsg + "\r\n")
+    regexhandling.handle_rlist(line, twitch_rlist, None)
 
 
   ##################### Server log stuff ######################
 
   # Get a single line from the Minecraft server
-  line = minecraft.getline()
+  line = externals.minecraft.getline()
 
   # Check that line is not empty
   if line != "":
-    print("Server: " + line)
-
-    # Check if it's a chat message
-    match = re.search("<(.*)> (.*)$", line)
-    if match:
-      # A chat message was received
-      chatter = match.group(1)
-      chatmsg = match.group(2)
-
-      if chatmsg.startswith("!"):
-        runcmd(getuser_byname(chatter), chatmsg[1:])
-
-    # A mapping between player name and UUID
-    match = re.search("^\\[[0-9:]*\\] \\[User Authenticator #[0-9]*/INFO\\]: UUID of player ([^ ]*) is ([0-9a-f-]*)$", line)
-    if match:
-      username = match.group(1)
-      uuid = match.group(2)
-
-      usernames[username] = uuid
-      getuser_byname(username)
+    if regexhandling.handle_rlist(line, server_rlist, None) == 0:
+      print("Server: " + line)
 
   # Make sure twitch messages that have been throttled get sent
-  twitch_message_update()
+  users.twitch_message_update()
 
-# [15:31:59] [User Authenticator #1/INFO]: UUID of player Hexchild is 05a96b16-9845-44b7-8af9-6e9976d81035
+  gods.effects()

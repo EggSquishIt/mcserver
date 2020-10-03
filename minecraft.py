@@ -1,0 +1,38 @@
+import simpleprocess
+import externals
+
+class Server(simpleprocess.SimpleProcess):
+	def __init__(self, cmdline):
+		simpleprocess.SimpleProcess.__init__(self, cmdline)
+		self.weather = "unknown"
+		self.daytime = 0
+
+	def say(self, msg):
+		msg = msg.replace("@", "\ufe6b")
+		msg = msg.replace("\r", "")
+
+		# Split multiline messages into one say command per line
+
+		# What to add before each line
+		# prefix = "tell " + userinfo["username"] + " "
+		prefix = "say "
+		# What to add after each line
+		suffix = "\r\n"
+		# What to add between lines
+		midfix = suffix + prefix
+		externals.minecraft.send(prefix + midfix.join(msg.split("\n")) + suffix)
+
+	def set_weather(self, new_weather):
+		if self.weather != new_weather:
+			self.weather = new_weather
+			self.send("weather " + new_weather + "\r\n")
+
+	def summon(self, entity_type, position = None, options = None):
+		print("Summoning entity type \"" + entity_type + "\" at " + str(position))
+		if position is None:
+			self.send("summon " + entity_type + "\r\n")
+		else:
+			self.send("summon " + entity_type + " " + position + "\r\n")
+
+	def title(self, title):
+		self.send("title @p title {\"text\": \"" + title + "\"}\r\n")
