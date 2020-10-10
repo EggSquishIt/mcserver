@@ -1,0 +1,21 @@
+
+How to set up an externally modded Java Minecraft server
+
+1. Check out the git repository
+  - Go to https://www.eggsquishit.net/
+  - Click the GitHub icon (the cat) at the top right
+  - Find the "mcserver" repository
+  - Follow GitHub's instructions to clone the repository locally
+
+2. Install the Java Minecraft server
+  - Create "mc" directory inside your cloned "mcserver" repo
+  - Download "server.jar" from the Mojang website
+  - Copy server.jar to "mc" directory
+  - Run server once inside the "mc" directory:
+    $ cd mc
+    $ java -Xmx1024M -Xms1024M -jar server.jar nogui
+  - Edit eula.txt to accept the Minecraft server EULA
+  - Edit server.properties
+
+3. Run the python wrapper in the "mcserver" clone
+  $ ./runserver.py
