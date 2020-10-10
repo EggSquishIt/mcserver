@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 # Some modules we need to use
-import re
 import os
 import sys
 import simpleprocess
@@ -25,7 +24,7 @@ if len(sys.argv) >= 3:
 # A hack to remove the session lock from any previously running server instance
 try:
   os.remove("world/session.lock")
-except:
+except FileNotFoundError:
   pass
 
 externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
