@@ -6,6 +6,7 @@ class Server(simpleprocess.SimpleProcess):
 		simpleprocess.SimpleProcess.__init__(self, cmdline, cwd)
 		self.weather = "unknown"
 		self.daytime = 0
+		self.type = "java"
 
 	def say(self, msg):
 		msg = msg.replace("@", "\ufe6b")
@@ -34,5 +35,7 @@ class Server(simpleprocess.SimpleProcess):
 		else:
 			self.send("summon " + entity_type + " " + position + "\r\n")
 
-	def title(self, title):
+	def announcement(self, title, subtitle = None):
+		if subtitle is not None:
+			self.send("title @p subtitle {\"text\": \"" + subtitle + "\"}\r\n")
 		self.send("title @p title {\"text\": \"" + title + "\"}\r\n")

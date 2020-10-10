@@ -136,6 +136,64 @@ Set or report the current mood of the gods.
 """
 }
 
+####### react command #######
+
+def cmd_react(match, entry, userinfo):
+  targetname = match.group(1)
+  opinion = float(match.group(2))
+
+  #if "admin" in userinfo and userinfo["admin"]:
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to have gods react"):
+    gods.react_byname(targetname, opinion)
+
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^react ([^ ]*) (.*)$",
+    "handler": cmd_react,
+  },
+  {
+    "regex": "^react$",
+    "handler": cmd_wrong_params,
+  },
+  {
+    "regex": "^react .*$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["react"] = {
+  "help": """
+!react <player> <number>
+Have the gods react positively or negatively to a player.
+"""
+}
+
+####### opinion command #######
+
+def cmd_opinion(match, entry, userinfo):
+  users.message(userinfo, "The gods " + gods.describe_opinion(users.getuservalue(userinfo, "opinion")) + " you")
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^opinion$",
+    "handler": cmd_opinion,
+  },
+  {
+    "regex": "^opinion .*$",
+    "handler": cmd_wrong_params,
+  },
+]
+
+help_map["opinion"] = {
+  "help": """
+!opinion
+Report how the gods feel about you.
+"""
+}
+
 ####### reward command #######
 
 def cmd_reward(match, entry, userinfo):

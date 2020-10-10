@@ -7,6 +7,7 @@ import users
 # Positive value means happy, negative means angry
 mood = 0
 
+last_effects_timestamp = time.monotonic()
 next_ominous = time.monotonic() + 60
 next_checkup = time.monotonic() + 15
 
@@ -30,6 +31,21 @@ def describe_mood(mood):
 	if mood <= -2:
 		return "annoyed"
 	return "nonplussed"
+
+def describe_opinion(opinion):
+	if opinion >= 100:
+		return "love"
+	if mood <= -100:
+		return "hate"
+	if mood >= 10:
+		return "like"
+	if mood <= -10:
+		return "dislike"
+	if mood >= 1:
+		return "favor"
+	if mood <= -1:
+		return "disvafor"
+	return "ignore"
 
 # entity.ghast.scream
 moodinfo = {
@@ -94,23 +110,27 @@ def restrict_daytime(lower, upper):
 
 # Various effects to indicate player standing, etc.
 def effects():
+	global last_effects_timestamp
 	global next_ominous
 	global next_checkup
 	global mood
 	global previous_moodstring
+
+	time_diff = time.monotonic() - last_effects_timestamp
+	mood = mood * (0.99 ** time_diff)
 
 	doing_checkup = False
 	if time.monotonic() > next_checkup:
 		next_checkup = time.monotonic() + 15
 		externals.minecraft.send("time query daytime\r\n")
 		doing_checkup = True
+		externals.minecraft.say("Godmood value: " + str(mood))
 
 	moodstring = describe_mood(mood)
 	if moodstring != previous_moodstring:
 		previous_moodstring = moodstring
-		#users.minecraft_message("The gods are " + moodstring + "!")
-		externals.minecraft.title("The gods are " + moodstring + "!")
-		externals.minecraft.send("playsound " + moodinfo[moodstring]["announce_sound"] + " ambient @p\r\n")
+		externals.minecraft.announcement("Gods are " + moodstring + "!")
+		externals.minecraft.send("execute at @p run playsound " + moodinfo[moodstring]["announce_sound"] + " ambient @p[" + ("limit" if externals.minecraft.type == "java" else "c") + "=1]\r\n")
 
 	if moodstring == "in nirvana":
 		effects_happyside()
@@ -153,3 +173,15 @@ def effects():
 		print(str(distance))
 		externals.minecraft.send("execute at @r run summon lightning_bolt ~ ~" + str(distance) + " ~\r\n")
 
+	last_effects_timestamp = time.monotonic()
+
+
+def react(userinfo, opinion):
+	global mood
+	users.adduservalue(userinfo, "opinion", opinion)
+	mood = mood + opinion
+
+def react_byname(username, opinion):
+	global mood
+	users.adduservalue_byname(username, "opinion", opinion)
+	mood = mood + opinion

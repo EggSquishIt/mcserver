@@ -49,12 +49,34 @@ def getuuid(userinfo):
 
   return userinfo["username"]
 
+def getuservalue(userinfo, key, default = 0):
+  if key in userinfo:
+    return userinfo[key]
+
+  return default
+
+def getuservalue_byname(username, key):
+  return getuservalue(getuser_byname(username), key)
+
+def setuservalue(userinfo, key, value):
+  userinfo[key] = value
+
+def setuservalue_byname(username, key, value):
+  return setuservalue(getuser_byname(username), key, value)
+
+def adduservalue(userinfo, key, delta):
+  return setuservalue(userinfo, key, getuservalue(userinfo, key) + delta)
+
+def adduservalue_byname(username, key, delta):
+  return adduservalue(getuser_byname(username), key, delta)
+
 def getuserstanding(userinfo):
   if "standing" in userinfo:
     return userinfo["standing"]
 
-  #if getchattype(userinfo) == "twitch":
-  #  return 10000
+  # Temporary hack to allow twitch chatters to have much fun
+  if getchattype(userinfo) == "twitch":
+    return 10000
 
   return 0
 
