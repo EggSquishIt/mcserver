@@ -5,10 +5,10 @@ import queue
 
 
 class SimpleProcess(threading.Thread):
-  def __init__(self, cmdline):
+  def __init__(self, cmdline, cwd = "."):
     threading.Thread.__init__(self)
     self.queue = queue.Queue()
-    self.program = subprocess.Popen(cmdline, shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE)
+    self.program = subprocess.Popen(cmdline, shell = True, stdout = subprocess.PIPE, stdin = subprocess.PIPE, cwd = cwd)
     self.start()
 
   def run(self):

@@ -2,8 +2,8 @@ import simpleprocess
 import externals
 
 class Server(simpleprocess.SimpleProcess):
-	def __init__(self, cmdline):
-		simpleprocess.SimpleProcess.__init__(self, cmdline)
+	def __init__(self, cmdline, cwd = "."):
+		simpleprocess.SimpleProcess.__init__(self, cmdline, cwd)
 		self.weather = "unknown"
 		self.daytime = 0
 

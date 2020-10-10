@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 
 # Some modules we need to use
 import re
@@ -18,7 +19,7 @@ except:
   pass
 
 externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
-externals.minecraft = minecraft.Server("java -Xmx1024M -Xms1024M -jar server.jar nogui")
+externals.minecraft = minecraft.Server("java -Xmx1024M -Xms1024M -jar server.jar nogui", cwd = "mc")
 externals.stdin = simpleprocess.SimpleStdin()
 
 # Function to store the python script's state
