@@ -3,6 +3,7 @@
 # Some modules we need to use
 import re
 import os
+import sys
 import simpleprocess
 import users
 import rewards
@@ -11,6 +12,15 @@ import externals
 import minecraft
 import regexhandling
 import gods
+
+externals.feature_id = "mc"
+externals.feature_description = "Minecraft server"
+
+if len(sys.argv) >= 2:
+  externals.feature_id = sys.argv[1]
+
+if len(sys.argv) >= 3:
+  externals.feature_description = sys.argv[2]
 
 # A hack to remove the session lock from any previously running server instance
 try:
@@ -439,16 +449,27 @@ Provides a list of commands, or help on a specific command.
 
 ####### twitch chat but not opted in #######
 
-def cmd_optout(match, entry, userinfo):
+def cmd_optout_arg(match, entry, userinfo):
+  feature = match.group(1)
+  if feature != externals.feature_id:
+    return
+
   if "optin" in userinfo:
     del userinfo["optin"]
     saveconfig()
     users.message(userinfo, userinfo["username"] + ", you have now opted out of being part of the experiment.")
 
+def cmd_optout_noarg(match, entry, userinfo):
+  users.message(userinfo, userinfo["username"] + ", you can opt out of " + externals.feature_description + " by typing !optout " + externals.feature_id)
+
 cmd_rlist = cmd_rlist + [
   {
+    "regex": "^optout (.*)$",
+    "handler": cmd_optout_arg,
+  },
+  {
     "regex": "^optout$",
-    "handler": cmd_optout,
+    "handler": cmd_optout_noarg,
   }
 ]
 
@@ -466,18 +487,29 @@ twitchonly_rlist = []
 
 ####### twitch chat but not opted in #######
 
-def twitchonly_optin(match, entry, userinfo):
+def twitchonly_optin_arg(match, entry, userinfo):
+  feature = match.group(1)
+  if feature != externals.feature_id:
+    return
+
   userinfo["optin"] = True
   saveconfig()
   users.message(userinfo, userinfo["username"] + ", you have now opted in to being part of the experiment.")
-  users.message(userinfo, "Your chat will now appear on the Minecraft server and potentially other places.")
+  users.message(userinfo, "Your chat will now appear on the " + externals.feature_description + ".")
   users.message(userinfo, "You now have access to a bunch of commands. Try !help")
-  users.message(userinfo, "You can opt out of this by typing !optout")
+  users.message(userinfo, "You can opt out of this by typing !optout " + externals.feature_id)
+
+def twitchonly_optin_noarg(match, entry, userinfo):
+  users.message(userinfo, "Try \"!optin " + externals.feature_id + "\" to join the " + externals.feature_description)
 
 twitchonly_rlist = twitchonly_rlist + [
   {
+    "regex": "^!optin (.*)$",
+    "handler": twitchonly_optin_arg,
+  },
+  {
     "regex": "^!optin$",
-    "handler": twitchonly_optin,
+    "handler": twitchonly_optin_noarg,
   }
 ]
 
