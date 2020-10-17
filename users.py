@@ -60,6 +60,7 @@ def getuservalue_byname(username, key):
 
 def setuservalue(userinfo, key, value):
   userinfo[key] = value
+  saveconfig()
 
 def setuservalue_byname(username, key, value):
   return setuservalue(getuser_byname(username), key, value)
