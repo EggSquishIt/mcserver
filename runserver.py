@@ -647,6 +647,7 @@ def server_uuid_map(match, entry, unused):
   
   users.setuuid_byname(username, uuid)
   users.getuser_byname(username)
+  saveconfig()
 
 server_rlist = server_rlist + [
   {
