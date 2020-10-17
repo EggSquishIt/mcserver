@@ -634,7 +634,7 @@ def server_chat_message(match, entry, unused):
 
 server_rlist = server_rlist + [
   {
-    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: <(.*)> (.*)$",
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: <([^>]+)> (.*)$",
     "handler": server_chat_message,
   }
 ]
