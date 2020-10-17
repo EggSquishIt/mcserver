@@ -98,8 +98,6 @@ Just do it!
 """
 }
 
-# execute as @p run summon lightning_bolt ~ ~512 ~
-
 ####### godmood command #######
 
 def cmd_godmood_set(match, entry, userinfo):
