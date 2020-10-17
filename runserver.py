@@ -334,27 +334,27 @@ help_map["server"] = {
 
 ####### title command #######
 
-def cmd_title(match, entry, userinfo):
+def cmd_announcement(match, entry, userinfo):
   if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to make a title"):
     msg = match.group(1)
-    externals.minecraft.title(msg)
+    externals.minecraft.announcement(msg)
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
-    "regex": "^title (.*)$",
-    "handler": cmd_title,
+    "regex": "^announcement (.*)$",
+    "handler": cmd_announcement,
   },
   {
-    "regex": "^title$",
+    "regex": "^announcement$",
     "handler": cmd_wrong_params,
   },
 ]
 
-help_map["title"] = {
+help_map["announcement"] = {
   "help": """
-!title <message>
-Show a title to all players.
+!announcement <message>
+Show a title (and possible subtitle) to all players.
 """
 }
 
