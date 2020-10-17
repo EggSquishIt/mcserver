@@ -4,13 +4,8 @@
 import os
 import sys
 import simpleprocess
-import users
-import rewards
-import permissions
+
 import externals
-import minecraft
-import regexhandling
-import gods
 
 externals.feature_id = "mc"
 externals.feature_description = "Minecraft server"
@@ -21,6 +16,11 @@ if len(sys.argv) >= 2:
 if len(sys.argv) >= 3:
   externals.feature_description = sys.argv[2]
 
+# rlist to react to log lines from the Minecraft server
+externals.server_rlist = []
+
+import minecraft
+
 # A hack to remove the session lock from any previously running server instance
 try:
   os.remove("world/session.lock")
@@ -30,6 +30,12 @@ except FileNotFoundError:
 externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
 externals.minecraft = minecraft.Server("java -Xmx1024M -Xms1024M -jar server.jar nogui", cwd = "mc")
 externals.stdin = simpleprocess.SimpleStdin()
+
+import users
+import rewards
+import permissions
+import regexhandling
+import gods
 
 # Function to store the python script's state
 def saveconfig():
@@ -604,21 +610,6 @@ twitch_rlist = twitch_rlist + [
 ###################################
 
 
-
-server_rlist = []
-
-####### current time of day #######
-
-def server_the_time_is(match, entry, unused):
-  externals.minecraft.daytime = int(match.group(1))
-
-server_rlist = server_rlist + [
-  {
-    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: The time is ([0-9]+)$",
-    "handler": server_the_time_is,
-  }
-]
-
 ####### player chat #######
 
 def server_chat_message(match, entry, unused):
@@ -630,7 +621,7 @@ def server_chat_message(match, entry, unused):
   if chatmsg.startswith("!"):
     runcmd(users.getuser_byname(chatter), chatmsg[1:])
 
-server_rlist = server_rlist + [
+externals.server_rlist = externals.server_rlist + [
   {
     "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: <([^>]+)> (.*)$",
     "handler": server_chat_message,
@@ -647,7 +638,7 @@ def server_uuid_map(match, entry, unused):
   users.getuser_byname(username)
   saveconfig()
 
-server_rlist = server_rlist + [
+externals.server_rlist = externals.server_rlist + [
   {
     "regex": "^\\[[0-9:]*\\] \\[User Authenticator #[0-9]*/INFO\\]: UUID of player ([^ ]*) is ([0-9a-f-]*)$",
     "handler": server_uuid_map,
@@ -687,7 +678,7 @@ while True:
 
   # Check that line is not empty
   if line != "":
-    if regexhandling.handle_rlist(line, server_rlist, None) == 0:
+    if regexhandling.handle_rlist(line, externals.server_rlist, None) == 0:
       print("Server: " + line)
 
   # Make sure twitch messages that have been throttled get sent

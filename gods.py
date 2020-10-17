@@ -108,6 +108,18 @@ def restrict_daytime(lower, upper):
 		externals.minecraft.daytime = lower
 		externals.minecraft.send("time set " + str(lower) + "\r\n")
 
+####### current time of day #######
+
+def server_the_time_is(match, entry, unused):
+  externals.minecraft.daytime = int(match.group(1))
+
+externals.server_rlist = externals.server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: The time is ([0-9]+)$",
+    "handler": server_the_time_is,
+  }
+]
+
 # Various effects to indicate player standing, etc.
 def effects():
 	global last_effects_timestamp
