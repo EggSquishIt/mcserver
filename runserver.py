@@ -598,7 +598,7 @@ def twitch_chat_message(match, entry, unused):
 
 twitch_rlist = twitch_rlist + [
   {
-    "regex": "^(.*): (.*)$",
+    "regex": "^<(.*)> (.*)$",
     "handler": twitch_chat_message,
   }
 ]
