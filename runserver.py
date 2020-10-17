@@ -226,8 +226,8 @@ Reward a player.
 ####### punish command #######
 
 def cmd_punish(match, entry, userinfo):
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + args):
-    targetname = match.group(1)
+  targetname = match.group(1)
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
     rewards.punish(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": 1
