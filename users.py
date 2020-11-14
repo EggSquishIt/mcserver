@@ -1,17 +1,10 @@
 import time
-import json
+import persistent
 import externals
 
 usernames = {}
-users = {}
 loaded = False
-
-try:
-  with open("users.json", "r") as f:
-    users = json.loads(f.read())
-except:
-  pass
-
+users = persistent.restore("users.json")
 loaded = True
 
 # Function to store the user data
@@ -21,8 +14,7 @@ def saveconfig():
   if not loaded:
   	return
 
-  with open("users.json", "w") as f:
-    f.write(json.dumps(users, indent = 2) + "\n")
+  persistent.store("users.json", users)
 
 def setuuid_byname(username, uuid):
   usernames[username] = uuid
