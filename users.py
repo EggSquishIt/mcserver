@@ -7,6 +7,14 @@ loaded = False
 users = persistent.restore("users.json")
 loaded = True
 
+def user_has_data(userinfo):
+  for key in userinfo:
+    if key == "id" or key == "username":
+      continue
+    return True
+
+  return False
+
 # Function to store the user data
 def saveconfig():
   global loaded
@@ -14,7 +22,19 @@ def saveconfig():
   if not loaded:
   	return
 
-  persistent.store("users.json", users)
+  users_copy = users.copy()
+
+  todelete = []
+  for id,userinfo in users_copy.items():
+  	if not user_has_data(userinfo):
+  	  todelete.append(id)
+  	if "playing" in userinfo:
+  	  del userinfo["playing"]
+
+  for id in todelete:
+  	del users_copy[id]
+
+  persistent.store("users.json", users_copy)
 
 def setuuid_byname(username, uuid):
   usernames[username] = uuid
