@@ -7,17 +7,45 @@ import mc_objectives
 import random
 import hashlib
 import rewards
+import names
 
 # Positive value means happy, negative means angry
 mood = 0
 
+team_colors = [
+	"black",
+	"dark_blue",
+	"dark_green",
+	"dark_aqua",
+	"dark_red",
+	"dark_purple",
+	"gold",
+	"gray",
+	"dark_gray",
+	"blue",
+	"green",
+	"aqua",
+	"red",
+	"light_purple",
+	"yellow",
+	"white"
+]
+
+factions = [
+	{
+		"description": "Foo",
+		"id": "black",
+		"level": 0
+	}
+]
+
 objective_criteria = {
 	"teamkill.": {
-		"description": "kill player in",
+		"description": "kill a",
 		"target_type": "team"
 	},
 	"killedByTeam.": {
-		"description": "get killed by player in",
+		"description": "get killed by a",
 		"target_type": "team"
 	},
 	"minecraft.picked_up:": {
@@ -55,18 +83,7 @@ objective_criteria = {
 }
 
 objective_targets = {
-	"team": [
-		{
-			"description": "team Red",
-			"id": "red",
-			"level": 0
-		},
-		{
-			"description": "team Blue",
-			"id": "blue",
-			"level": 0
-		}
-	],
+	"team": factions,
 	"item": [
 		{
 			"description": "a stone sword",
@@ -174,6 +191,57 @@ def give_item(userinfo, award, remaining_level):
   externals.minecraft.send("give " + userinfo["username"] + " " + award["id"] + " " + str(award["amount"]) + "\r\n")
   return award["level"]
 
+
+def faction_join(match, entry, unused):
+	global factions
+	username = match.group(1)
+	userinfo = users.getuser_byname(username)
+
+	if "team" in userinfo:
+		for faction in factions:
+			if userinfo["team"] == faction["id"]:
+				if userinfo["team_description"] == faction["description"]:
+					return
+
+	faction = random.choice(factions)
+	userinfo["team"] = faction["id"]
+	userinfo["team_description"] = faction["description"]
+
+	externals.minecraft.send("team leave " + userinfo["username"] + "\r\n")
+	externals.minecraft.send("team join " + faction["id"] + " " + userinfo["username"] + "\r\n")
+
+externals.server_rlist = externals.server_rlist + [
+	{
+		"regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: (.*) joined the game",
+		"handler": faction_join,
+	}
+]
+
+def randomize_factions():
+	global factions
+	global objective_targets
+
+	factions = []
+	objective_targets["team"] = factions
+
+	colors = team_colors.copy()
+	for index in range(0, random.randint(1, 5)):
+		color = random.choice(colors)
+		colors.remove(color)
+
+		factions.append({
+			"description": names.proper_case(names.generate_name()),
+			"id": color,
+			"level": 0
+		})
+
+	for team_color in team_colors:
+		externals.minecraft.send("team remove " + team_color + "\r\n")
+
+	for faction in factions:
+		externals.minecraft.send("team add " + faction["id"] + "\r\n")
+		externals.minecraft.send("team modify " + faction["id"] + " color " + faction["id"] + "\r\n")
+
 def randomize_awards():
 	rewards.awards.append({
 		"description": "strike with a lightning bolt",
@@ -259,6 +327,7 @@ def randomize_world_actions():
 	update_world_actions()
 
 def generate_pantheon():
+	randomize_factions()
 	randomize_awards()
 	randomize_world_actions()
 
