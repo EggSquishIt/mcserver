@@ -155,3 +155,31 @@ def message(userinfo, msg):
 
   if chattype == "minecraft":
     minecraft_message(msg)
+
+#[17:12:18] [Server thread/INFO]: Hexchild joined the game
+#[17:12:35] [Server thread/INFO]: Hexchild left the game
+
+
+####### run at startup #######
+
+def user_join(match, entry, unused):
+	username = match.group(1)
+	userinfo = getuser_byname(username)
+	userinfo["playing"] = True
+
+def user_leave(match, entry, unused):
+	username = match.group(1)
+	userinfo = getuser_byname(username)
+	if "playing" in userinfo:
+		del userinfo["playing"]
+
+externals.server_rlist = externals.server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: (.*) joined the game",
+    "handler": user_join,
+  },
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: (.*) left the game",
+    "handler": user_leave,
+  }
+]
