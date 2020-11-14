@@ -298,6 +298,17 @@ def update_world_actions():
 	for objective in to_delete:
 		del mc_objectives.objectives[objective]
 
+	for id,userinfo in users.users.items():
+		if "objectives" in userinfo:
+			todelete = []
+			for objective in userinfo["objectives"]:
+				if objective.startswith("gods_"):
+					todelete.append(objective)
+			for objective in todelete:
+				del userinfo["objectives"][objective]
+
+	users.saveconfig()
+
 	mc_objectives.update_objectives()
 
 def randomize_world_actions():
