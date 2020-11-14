@@ -9,7 +9,7 @@ import persistent
 import externals
 
 loaded = False
-externals.settings = persistent.restore("setting.json")
+externals.settings = persistent.restore("settings.json")
 loaded = True
 
 # How many times faster the gods should react (default 1)
