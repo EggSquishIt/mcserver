@@ -12,6 +12,10 @@ loaded = False
 externals.settings = persistent.restore("settings.json")
 loaded = True
 
+# Whether twitch integration should be done
+if "use_twitch" not in externals.settings:
+  externals.settings["use_twitch"] = False
+
 # How many times faster the gods should react (default 1)
 if "timescale" not in externals.settings:
   externals.settings["timescale"] = 1
@@ -43,7 +47,9 @@ try:
 except FileNotFoundError:
   pass
 
-externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
+if externals.settings["use_twitch"]:
+  externals.twitch = simpleprocess.SimpleProcess("node twitch_chat.js")
+
 externals.minecraft = minecraft.Server("java -Xmx1024M -Xms1024M -jar server.jar nogui", cwd = "mc")
 externals.stdin = simpleprocess.SimpleStdin()
 
@@ -514,6 +520,10 @@ Have the server speak.
 ####### twitch_say command #######
 
 def cmd_twitch_say(match, entry, userinfo):
+  if not externals.settings["use_twitch"]:
+    users.message(userinfo, "Twitch integration is disabled.")
+    return
+
   if "admin" in userinfo and userinfo["admin"]:
     msg = match.group(1)
     externals.twitch.send("say EggSquishIt " + msg + "\n")
@@ -672,6 +682,10 @@ twitchonly_rlist = []
 ####### twitch chat but not opted in #######
 
 def twitchonly_optin_arg(match, entry, userinfo):
+  if not externals.settings["use_twitch"]:
+    users.message(userinfo, "Twitch integration is disabled.")
+    return
+
   feature = match.group(1)
   if feature != externals.settings["feature_id"]:
     return
@@ -684,6 +698,10 @@ def twitchonly_optin_arg(match, entry, userinfo):
   users.message(userinfo, "You can opt out of this by typing !optout " + externals.settings["feature_id"])
 
 def twitchonly_optin_noarg(match, entry, userinfo):
+  if not externals.settings["use_twitch"]:
+    users.message(userinfo, "Twitch integration is disabled.")
+    return
+
   users.message(userinfo, "Try \"!optin " + externals.settings["feature_id"] + "\" to join the " + externals.settings["feature_description"])
 
 twitchonly_rlist = twitchonly_rlist + [
@@ -788,12 +806,13 @@ while True:
 
   ##################### Twitch chat stuff ######################
 
-  # Get a single line from the Twitch chat
-  line = externals.twitch.getline()
+  if externals.settings["use_twitch"]:
+    # Get a single line from the Twitch chat
+    line = externals.twitch.getline()
 
-  # Check that line is not empty
-  if line != "":
-    regexhandling.handle_rlist(line, twitch_rlist, None)
+    # Check that line is not empty
+    if line != "":
+      regexhandling.handle_rlist(line, twitch_rlist, None)
 
 
   ##################### Server log stuff ######################
@@ -809,7 +828,8 @@ while True:
 
   ##################### Once-per-tick stuff ######################
 
-  # Make sure twitch messages that have been throttled get sent
-  users.twitch_message_update()
+  if externals.settings["use_twitch"]:
+    # Make sure twitch messages that have been throttled get sent
+    users.twitch_message_update()
 
   gods.effects()
