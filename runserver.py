@@ -58,31 +58,6 @@ def cmd_wrong_params(match, entry, userinfo):
 cmd_rlist = []
 help_map = {}
 
-####### clear_objectives command #######
-
-def cmd_clear_objectives(match, entry, userinfo):
-  mc_objectives.objectives = {
-    "zombiesKilled": "minecraft.killed:minecraft.zombie",
-    "chickensKilled": "minecraft.killed:minecraft.chicken",
-  }
-  mc_objectives.update_objectives()
-  return True # No more processing from command list
-
-cmd_rlist = cmd_rlist + [
-  {
-    "regex": "^clear_objectives$",
-    "handler": cmd_clear_objectives,
-  },
-]
-
-help_map["summon"] = {
-  "help": """
-!summon <entity_type>
-!summon <entity_type> <position>
-Summons an entity.
-"""
-}
-
 ####### godreset command #######
 
 def cmd_godreset(match, entry, userinfo):
