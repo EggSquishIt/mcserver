@@ -4,26 +4,33 @@
 import os
 import sys
 import simpleprocess
+import persistent
 
 import externals
 
-# To debug quicker (normal value is 1)
-externals.timescale = 1
+loaded = False
+externals.settings = persistent.restore("setting.json")
+loaded = True
 
-# To debug more efficiently (normal value is 1)
-externals.moodscale = 1
+# How many times faster the gods should react (default 1)
+if "timescale" not in externals.settings:
+  externals.settings["timescale"] = 1
 
-# How many things the gods will react to
-externals.number_of_world_actions = 30
+# How manu times stronger god reactions should be (default 1)
+if "moodscale" not in externals.settings:
+  externals.settings["moodscale"] = 1
 
-externals.feature_id = "mc"
-externals.feature_description = "Minecraft server"
+# How many things the players can do that gods will react to (default 30)
+if "number_of_world_actions" not in externals.settings:
+  externals.settings["number_of_world_actions"] = 30
 
-if len(sys.argv) >= 2:
-  externals.feature_id = sys.argv[1]
+# ID of the server on twitch (that you can type after optin or optout)
+if "feature_id" not in externals.settings:
+  externals.settings["feature_id"] = "mc"
 
-if len(sys.argv) >= 3:
-  externals.feature_description = sys.argv[2]
+# Description of the server
+if "feature_description" not in externals.settings:
+  externals.settings["feature_description"] = "Minecraft server"
 
 # rlist to react to log lines from the Minecraft server
 externals.server_rlist = []
@@ -49,7 +56,14 @@ import mc_objectives
 
 # Function to store the python script's state
 def saveconfig():
+  global loaded
+
+  if not loaded:
+    return
+
   users.saveconfig()
+
+  persistent.store("settings.json", externals.settings)
 
 def cmd_wrong_params(match, entry, userinfo):
   users.message(userinfo, "Incorrect usage of command")
@@ -621,7 +635,7 @@ Provides a list of commands, or help on a specific command.
 
 def cmd_optout_arg(match, entry, userinfo):
   feature = match.group(1)
-  if feature != externals.feature_id:
+  if feature != externals.settings["feature_id"]:
     return
 
   if "optin" in userinfo:
@@ -630,7 +644,7 @@ def cmd_optout_arg(match, entry, userinfo):
     users.message(userinfo, userinfo["username"] + ", you have now opted out of being part of the experiment.")
 
 def cmd_optout_noarg(match, entry, userinfo):
-  users.message(userinfo, userinfo["username"] + ", you can opt out of " + externals.feature_description + " by typing !optout " + externals.feature_id)
+  users.message(userinfo, userinfo["username"] + ", you can opt out of " + externals.settings["feature_description"] + " by typing !optout " + externals.settings["feature_id"])
 
 cmd_rlist = cmd_rlist + [
   {
@@ -659,18 +673,18 @@ twitchonly_rlist = []
 
 def twitchonly_optin_arg(match, entry, userinfo):
   feature = match.group(1)
-  if feature != externals.feature_id:
+  if feature != externals.settings["feature_id"]:
     return
 
   userinfo["optin"] = True
   saveconfig()
   users.message(userinfo, userinfo["username"] + ", you have now opted in to being part of the experiment.")
-  users.message(userinfo, "Your chat will now appear on the " + externals.feature_description + ".")
+  users.message(userinfo, "Your chat will now appear on the " + externals.settings["feature_description"] + ".")
   users.message(userinfo, "You now have access to a bunch of commands. Try !help")
-  users.message(userinfo, "You can opt out of this by typing !optout " + externals.feature_id)
+  users.message(userinfo, "You can opt out of this by typing !optout " + externals.settings["feature_id"])
 
 def twitchonly_optin_noarg(match, entry, userinfo):
-  users.message(userinfo, "Try \"!optin " + externals.feature_id + "\" to join the " + externals.feature_description)
+  users.message(userinfo, "Try \"!optin " + externals.settings["feature_id"] + "\" to join the " + externals.settings["feature_description"])
 
 twitchonly_rlist = twitchonly_rlist + [
   {

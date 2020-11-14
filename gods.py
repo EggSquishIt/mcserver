@@ -237,7 +237,7 @@ def randomize_world_actions():
 
 	world_actions = {}
 	hashes_used = []
-	while len(hashes_used) < externals.number_of_world_actions:
+	while len(hashes_used) < externals.settings["number_of_world_actions"]:
 		criterium = random.choice(list(objective_criteria.keys()))
 		criterium_description = objective_criteria[criterium]["description"]
 		target_type = objective_criteria[criterium]["target_type"]
@@ -265,7 +265,7 @@ def generate_pantheon():
 last_effects_timestamp = time.monotonic()
 next_ominous = time.monotonic() + 60
 next_checkup = time.monotonic() + 15
-next_award = time.monotonic() + 300 / externals.timescale
+next_award = time.monotonic() + 300 / externals.settings["timescale"]
 
 previous_moodstring = "unknown"
 
@@ -460,10 +460,9 @@ def effects():
 			objective = "gods_" + world_action_id
 			externals.minecraft.send("scoreboard players get @p " + objective + "\r\n")
 		doing_checkup = True
-		externals.minecraft.say("Godmood value: " + str(mood))
 
 	if time.monotonic() > next_award:
-		next_award = time.monotonic() + random.randint(120, 600) / externals.timescale
+		next_award = time.monotonic() + random.randint(120, 600) / externals.settings["timescale"]
 		playing_users = { id: userinfo for id, userinfo in users.users.items() if "playing" in userinfo and userinfo["playing"] }
 		if len(playing_users):
 			userinfo = users.users[random.choice(list(playing_users.keys()))]
@@ -540,7 +539,7 @@ def effects():
 			externals.minecraft.send("scoreboard players set " + userinfo["username"] + " " + objective + " 0\r\n")
 
 			print(userinfo["username"] + " has score " + str(score) + " on " + objective + " (" + world_action["description"] + ")")
-			react(userinfo, world_action["opinion"] * score * 0.1 * externals.moodscale)
+			react(userinfo, world_action["opinion"] * score * 0.1 * externals.settings["moodscale"])
 
 			user_objectives[objective] = 0
 			users.saveconfig()
