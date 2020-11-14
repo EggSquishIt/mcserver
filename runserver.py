@@ -7,6 +7,15 @@ import simpleprocess
 
 import externals
 
+# To debug quicker (normal value is 1)
+externals.timescale = 1
+
+# To debug more efficiently (normal value is 1)
+externals.moodscale = 1
+
+# How many things the gods will react to
+externals.number_of_world_actions = 30
+
 externals.feature_id = "mc"
 externals.feature_description = "Minecraft server"
 
@@ -36,6 +45,7 @@ import rewards
 import permissions
 import regexhandling
 import gods
+import mc_objectives
 
 # Function to store the python script's state
 def saveconfig():
@@ -47,6 +57,72 @@ def cmd_wrong_params(match, entry, userinfo):
 
 cmd_rlist = []
 help_map = {}
+
+####### clear_objectives command #######
+
+def cmd_clear_objectives(match, entry, userinfo):
+  mc_objectives.objectives = {
+    "zombiesKilled": "minecraft.killed:minecraft.zombie",
+    "chickensKilled": "minecraft.killed:minecraft.chicken",
+  }
+  mc_objectives.update_objectives()
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^clear_objectives$",
+    "handler": cmd_clear_objectives,
+  },
+]
+
+help_map["summon"] = {
+  "help": """
+!summon <entity_type>
+!summon <entity_type> <position>
+Summons an entity.
+"""
+}
+
+####### godreset command #######
+
+def cmd_godreset(match, entry, userinfo):
+  gods.generate_pantheon()
+  gods.mood = 0
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^godreset$",
+    "handler": cmd_godreset,
+  },
+]
+
+help_map["godreset"] = {
+  "help": """
+!godreset
+Replace the current pantheon with a new one.
+"""
+}
+
+####### godreset command #######
+
+def cmd_insight(match, entry, userinfo):
+  gods.list_world_actions(userinfo)
+  return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^insight$",
+    "handler": cmd_insight,
+  },
+]
+
+help_map["insight"] = {
+  "help": """
+!insight
+Get the scoop on what the gods like and dislike.
+"""
+}
 
 ####### summon command #######
 
@@ -200,6 +276,27 @@ Report how the gods feel about you.
 
 ####### reward command #######
 
+def cmd_reward_withvalueandreason(match, entry, userinfo):
+  targetname = match.group(1)
+  level = int(match.group(2))
+  reason = match.group(3)
+  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+    rewards.reward(users.getuser_byname(targetname), {
+      "reason": reason,
+      "level": level
+    })
+  return True # No more processing from command list
+
+def cmd_reward_withvalue(match, entry, userinfo):
+  targetname = match.group(1)
+  level = int(match.group(2))
+  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+    rewards.reward(users.getuser_byname(targetname), {
+      "reason": "Unspecified reason",
+      "level": level
+    })
+  return True # No more processing from command list
+
 def cmd_reward(match, entry, userinfo):
   targetname = match.group(1)
   if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
@@ -210,6 +307,14 @@ def cmd_reward(match, entry, userinfo):
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^reward ([^ ]+) ([^ ]+) (.*)$",
+    "handler": cmd_reward_withvalueandreason,
+  },
+  {
+    "regex": "^reward ([^ ]+) (.*)$",
+    "handler": cmd_reward_withvalue,
+  },
   {
     "regex": "^reward (.*)$",
     "handler": cmd_reward,
@@ -229,6 +334,27 @@ Reward a player.
 
 ####### punish command #######
 
+def cmd_punish_withvalueandreason(match, entry, userinfo):
+  targetname = match.group(1)
+  level = int(match.group(2))
+  reason = match.group(3)
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
+    rewards.punish(users.getuser_byname(targetname), {
+      "reason": reason,
+      "level": level
+    })
+  return True # No more processing from command list
+
+def cmd_punish_withvalue(match, entry, userinfo):
+  targetname = match.group(1)
+  level = int(match.group(2))
+  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
+    rewards.punish(users.getuser_byname(targetname), {
+      "reason": "Unspecified reason",
+      "level": level
+    })
+  return True # No more processing from command list
+
 def cmd_punish(match, entry, userinfo):
   targetname = match.group(1)
   if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
@@ -239,6 +365,14 @@ def cmd_punish(match, entry, userinfo):
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
+  {
+    "regex": "^punish ([^ ]+) ([^ ]+) (.*)$",
+    "handler": cmd_punish_withvalueandreason,
+  },
+  {
+    "regex": "^punish ([^ ]+) (.*)$",
+    "handler": cmd_punish_withvalue,
+  },
   {
     "regex": "^punish (.*)$",
     "handler": cmd_punish,
@@ -586,6 +720,8 @@ def twitch_chat_message(match, entry, unused):
   chatter = "twitch:" + match.group(1)
   chatmsg = match.group(2)
 
+  print("[twitch] <" + chatter + "> " + chatmsg)
+
   userinfo = users.getuser_byname(chatter)
 
   if "optin" in userinfo and userinfo["optin"]:
@@ -680,6 +816,9 @@ while True:
   if line != "":
     if regexhandling.handle_rlist(line, externals.server_rlist, None) == 0:
       print("Server: " + line)
+
+
+  ##################### Once-per-tick stuff ######################
 
   # Make sure twitch messages that have been throttled get sent
   users.twitch_message_update()
