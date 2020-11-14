@@ -4,6 +4,7 @@ import externals
 
 usernames = {}
 users = {}
+loaded = False
 
 try:
   with open("users.json", "r") as f:
@@ -11,8 +12,15 @@ try:
 except:
   pass
 
+loaded = True
+
 # Function to store the user data
 def saveconfig():
+  global loaded
+
+  if not loaded:
+  	return
+
   with open("users.json", "w") as f:
     f.write(json.dumps(users, indent = 2) + "\n")
 
