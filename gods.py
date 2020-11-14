@@ -35,15 +35,15 @@ def describe_mood(mood):
 def describe_opinion(opinion):
 	if opinion >= 100:
 		return "love"
-	if mood <= -100:
+	if opinion <= -100:
 		return "hate"
-	if mood >= 10:
+	if opinion >= 10:
 		return "like"
-	if mood <= -10:
+	if opinion <= -10:
 		return "dislike"
-	if mood >= 1:
+	if opinion >= 1:
 		return "favor"
-	if mood <= -1:
+	if opinion <= -1:
 		return "disvafor"
 	return "ignore"
 
