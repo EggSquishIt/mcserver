@@ -5,7 +5,7 @@ import os
 import sys
 import simpleprocess
 import persistent
-
+import time
 import externals
 
 loaded = False
@@ -81,25 +81,56 @@ def cmd_wrong_params(match, entry, userinfo):
 cmd_rlist = []
 help_map = {}
 
-####### godreset command #######
+####### temple command #######
 
-def cmd_godreset(match, entry, userinfo):
+def cmd_temple(match, entry, userinfo):
+	temple_position = (112, 64, -207)
 	if permissions.check_cmd(userinfo, entry):
-		gods.generate_pantheon()
-		gods.mood = 0
+		externals.minecraft.send("setblock " + minecraft.pos2str(temple_position) + " structure_block{mode:\"LOAD\",name:\"eg:temple\"}\r\n")
+		externals.minecraft.send("setblock " + minecraft.pos2str(temple_position, (0, 0, 1)) + " redstone_block\r\n")
+		externals.minecraft.send("setblock " + minecraft.pos2str(temple_position, (0, 2, 0)) + " air\r\n")
 		return True # No more processing from command list
+
+# particle minecraft:campfire_signal_smoke 113 66 -205 0.2 0.2 0.2 0.0001 20
+# particle minecraft:campfire_signal_smoke 114 66 -205 0.2 0.2 0.2 0.0001 20
+# particle minecraft:campfire_signal_smoke 113 66 -206 0.2 0.2 0.2 0.0001 20
+# particle minecraft:campfire_signal_smoke 114 66 -206 0.2 0.2 0.2 0.0001 20
 
 cmd_rlist = cmd_rlist + [
 	{
-		"regex": "^godreset$",
-		"handler": cmd_godreset,
-		"reason": "Trying to reset the pantheon",
+		"regex": "^temple$",
+		"handler": cmd_temple,
+		"reason": "Trying to spawn a temple",
 		"default_permissions": { "allowed": False }
 	},
 ]
 
-help_map["godreset"] = {
+help_map["temple"] = {
 	"help": """
+!temple
+Spawn a temple somewhere in the world.
+"""
+}
+
+####### godreset command #######
+
+def cmd_godreset(match, entry, userinfo):
+    if permissions.check_cmd(userinfo, entry):
+        gods.generate_pantheon()
+        gods.mood = 0
+        return True # No more processing from command list
+
+cmd_rlist = cmd_rlist + [
+    {
+        "regex": "^godreset$",
+        "handler": cmd_godreset,
+        "reason": "Trying to reset the pantheon",
+        "default_permissions": { "allowed": False }
+    },
+]
+
+help_map["godreset"] = {
+    "help": """
 !godreset
 Replace the current pantheon with a new one.
 """

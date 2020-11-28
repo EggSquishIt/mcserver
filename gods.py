@@ -8,9 +8,13 @@ import random
 import hashlib
 import rewards
 import names
+import minecraft
 
 # Positive value means happy, negative means angry
 mood = 0
+
+# Where the temple goes. Hard-coded for now
+temple_position = (112, 64, -207)
 
 team_colors = [
 	"black",
@@ -88,12 +92,14 @@ objective_targets = {
 		{
 			"description": "a stone sword",
 			"id": "minecraft.stone_sword",
+			"game_description": "Stone Sword",
 			"level": 20,
 			"occurrence": 80
 		},
 		{
 			"description": "a glowstone",
 			"id": "minecraft.glowstone",
+			"game_description": "Glowstone",
 			"level": 30,
 			"occurrence": 10
 		}
@@ -337,15 +343,24 @@ def randomize_world_actions():
 
 	update_world_actions()
 
+def generate_temple():
+	global temple_position
+
+	externals.minecraft.send("setblock " + minecraft.pos2str(temple_position) + " structure_block{mode:\"LOAD\",name:\"eg:temple\"}\r\n")
+	externals.minecraft.send("setblock " + minecraft.pos2str(temple_position, (0, 0, 1)) + " redstone_block\r\n")
+	externals.minecraft.send("setblock " + minecraft.pos2str(temple_position, (0, 2, 0)) + " air\r\n")
+
 def generate_pantheon():
 	randomize_factions()
 	randomize_awards()
 	randomize_world_actions()
+	generate_temple()
 
 last_effects_timestamp = time.monotonic()
 next_ominous = time.monotonic() + 60
 next_checkup = time.monotonic() + 15
 next_award = time.monotonic() + 300 / externals.settings["timescale"]
+next_sacrifice = time.monotonic() + 5
 
 previous_moodstring = "unknown"
 
@@ -502,6 +517,40 @@ externals.server_rlist = externals.server_rlist + [
   }
 ]
 
+####### look for attributed sacrifices #######
+
+def server_thanked_player(match, entry, unused):
+	game_description = match.group(1)
+	username = match.group(2)
+	for type,target_list in objective_targets.items():
+		for target in target_list:
+			if "game_description" in target and target["game_description"] == game_description:
+				value = 100 / target["occurrence"]
+			else:
+				value = 1
+			react_byname(username, value)
+			return
+
+externals.server_rlist = externals.server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: \\[Server\\] The gods have accepted the (.*) sacrificed by (.*)$",
+    "handler": server_thanked_player,
+  }
+]
+
+####### look for sacrifices #######
+
+def server_killed_entity(match, entry, unused):
+	game_description = match.group(1)
+	externals.minecraft.send("execute positioned " + minecraft.pos2str(temple_position, (1.5, 1, 1.5)) + " run say The gods have accepted the " + game_description + " sacrificed by @p[limit=1]\r\n")
+
+externals.server_rlist = externals.server_rlist + [
+  {
+    "regex": "^\\[[0-9:]*\\] \\[Server thread/INFO\\]: Killed (.*)$",
+    "handler": server_killed_entity,
+  }
+]
+
 ####### run at startup #######
 
 def server_startup(match, entry, unused):
@@ -518,13 +567,13 @@ externals.server_rlist = externals.server_rlist + [
   }
 ]
 
-
 # Various effects to indicate player standing, etc.
 def effects():
 	global last_effects_timestamp
 	global next_ominous
 	global next_checkup
 	global next_award
+	global next_sacrifice
 	global mood
 	global previous_moodstring
 	global world_actions
@@ -540,6 +589,13 @@ def effects():
 			objective = "gods_" + world_action_id
 			externals.minecraft.send("scoreboard players get @p " + objective + "\r\n")
 		doing_checkup = True
+
+	if time.monotonic() > next_sacrifice:
+		next_sacrifice = time.monotonic() + 2
+		for xoffset in range(2):
+			for zoffset in range(2):
+				externals.minecraft.send("particle minecraft:campfire_signal_smoke " + minecraft.pos2str(temple_position, (xoffset + 1, 1, zoffset + 1)) + " 0.2 0.2 0.2 0.0001 5\r\n")
+		externals.minecraft.send("kill @e[x=" + str(temple_position[0] + 1) + ",y=" + str(temple_position[1] + 1) + ",z=" + str(temple_position[2] + 1) + ",dx=1,dz=1,limit=1]\r\n")
 
 	if time.monotonic() > next_award:
 		next_award = time.monotonic() + random.randint(120, 600) / externals.settings["timescale"]

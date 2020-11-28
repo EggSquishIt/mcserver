@@ -67,3 +67,6 @@ class Server(simpleprocess.SimpleProcess):
 		if subtitle is not None:
 			self.send("title @p subtitle {\"text\": \"" + subtitle + "\"}\r\n")
 		self.send("title @p title {\"text\": \"" + title + "\"}\r\n")
+
+def pos2str(pos, adj = (0, 0, 0)):
+	return str(pos[0] + adj[0]) + " " + str(pos[1] + adj[1]) + " " + str(pos[2] + adj[2])
