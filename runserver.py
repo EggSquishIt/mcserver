@@ -71,6 +71,9 @@ def saveconfig():
 
   persistent.store("settings.json", externals.settings)
 
+if "permissions" not in externals.settings:
+  externals.settings["permissions"] = {}
+
 def cmd_wrong_params(match, entry, userinfo):
   users.message(userinfo, "Incorrect usage of command")
   return True # No more processing from command list
@@ -81,14 +84,17 @@ help_map = {}
 ####### godreset command #######
 
 def cmd_godreset(match, entry, userinfo):
-  gods.generate_pantheon()
-  gods.mood = 0
-  return True # No more processing from command list
+  if permissions.check_cmd(userinfo, entry):
+    gods.generate_pantheon()
+    gods.mood = 0
+    return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^godreset$",
     "handler": cmd_godreset,
+    "reason": "Trying to reset the pantheon",
+    "default_permissions": { "allowed": False }
   },
 ]
 
@@ -102,13 +108,16 @@ Replace the current pantheon with a new one.
 ####### godreset command #######
 
 def cmd_insight(match, entry, userinfo):
-  gods.list_world_actions(userinfo)
+  if permissions.check_cmd(userinfo, entry):
+    gods.list_world_actions(userinfo)
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^insight$",
     "handler": cmd_insight,
+    "reason": "Trying to gain insight",
+    "default_permissions": { "allowed": False }
   },
 ]
 
@@ -122,24 +131,30 @@ Get the scoop on what the gods like and dislike.
 ####### summon command #######
 
 def cmd_summon(match, entry, userinfo):
-  entity_type = match.group(1)
-  externals.minecraft.summon(entity_type)
+  if permissions.check_cmd(userinfo, entry):
+    entity_type = match.group(1)
+    externals.minecraft.summon(entity_type)
   return True # No more processing from command list
 
 def cmd_summon_with_position(match, entry, userinfo):
-  entity_type = match.group(1)
-  position = match.group(2)
-  externals.minecraft.summon(entity_type, position)
+  if permissions.check_cmd(userinfo, entry):
+    entity_type = match.group(1)
+    position = match.group(2)
+    externals.minecraft.summon(entity_type, position)
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^summon ([^ ]*)$",
     "handler": cmd_summon,
+    "reason": "Trying to summon an entity",
+    "default_permissions": { "minimum_standing": 1000 }
   },
   {
     "regex": "^summon ([^ ]*) (.*)$",
     "handler": cmd_summon_with_position,
+    "reason": "Trying to summon an entity",
+    "default_permissions": { "minimum_standing": 1000 }
   },
   {
     "regex": "^summon$",
@@ -158,13 +173,15 @@ Summons an entity.
 ####### ominous command #######
 
 def cmd_ominous(match, entry, userinfo):
-  externals.minecraft.send("execute as @p run summon lightning_bolt ~ ~512 ~\r\n")
+  if permissions.check_cmd(userinfo, entry):
+    externals.minecraft.send("execute as @p run summon lightning_bolt ~ ~512 ~\r\n")
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^ominous$",
     "handler": cmd_ominous,
+    "reason": "Trying to summon ominous lightning",
   },
 ]
 
@@ -178,8 +195,7 @@ Just do it!
 ####### godmood command #######
 
 def cmd_godmood_set(match, entry, userinfo):
-  #if "admin" in userinfo and userinfo["admin"]:
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to set godmood"):
+  if permissions.check_cmd(userinfo, entry):
     newmood = match.group(1)
     try:
       gods.mood = float(newmood)
@@ -189,17 +205,21 @@ def cmd_godmood_set(match, entry, userinfo):
   return True # No more processing from command list
 
 def cmd_godmood_report(match, entry, userinfo):
-  users.message(userinfo, "The gods are currently " + gods.describe_mood(gods.mood))
+  if permissions.check_cmd(userinfo, entry):
+    users.message(userinfo, "The gods are currently " + gods.describe_mood(gods.mood))
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^godmood (.*)$",
     "handler": cmd_godmood_set,
+    "reason": "Trying to set godmood",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^godmood$",
     "handler": cmd_godmood_report,
+    "reason": "Requesting the current godmood",
   },
 ]
 
@@ -214,11 +234,9 @@ Set or report the current mood of the gods.
 ####### react command #######
 
 def cmd_react(match, entry, userinfo):
-  targetname = match.group(1)
-  opinion = float(match.group(2))
-
-  #if "admin" in userinfo and userinfo["admin"]:
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to have gods react"):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
+    opinion = float(match.group(2))
     gods.react_byname(targetname, opinion)
 
   return True # No more processing from command list
@@ -227,6 +245,8 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^react ([^ ]*) (.*)$",
     "handler": cmd_react,
+    "reason": "Trying to have the gods react to a player",
+    "default_permissions": { "minimum_standing": 1000 }
   },
   {
     "regex": "^react$",
@@ -248,13 +268,15 @@ Have the gods react positively or negatively to a player.
 ####### opinion command #######
 
 def cmd_opinion(match, entry, userinfo):
-  users.message(userinfo, "The gods " + gods.describe_opinion(users.getuservalue(userinfo, "opinion")) + " you")
+  if permissions.check_cmd(userinfo, entry):
+    users.message(userinfo, "The gods " + gods.describe_opinion(users.getuservalue(userinfo, "opinion")) + " you")
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^opinion$",
     "handler": cmd_opinion,
+    "reason": "Trying to gain personal insight",
   },
   {
     "regex": "^opinion .*$",
@@ -272,10 +294,10 @@ Report how the gods feel about you.
 ####### reward command #######
 
 def cmd_reward_withvalueandreason(match, entry, userinfo):
-  targetname = match.group(1)
-  level = int(match.group(2))
-  reason = match.group(3)
-  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
+    level = int(match.group(2))
+    reason = match.group(3)
     rewards.reward(users.getuser_byname(targetname), {
       "reason": reason,
       "level": level
@@ -283,9 +305,9 @@ def cmd_reward_withvalueandreason(match, entry, userinfo):
   return True # No more processing from command list
 
 def cmd_reward_withvalue(match, entry, userinfo):
-  targetname = match.group(1)
-  level = int(match.group(2))
-  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
+    level = int(match.group(2))
     rewards.reward(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": level
@@ -293,8 +315,8 @@ def cmd_reward_withvalue(match, entry, userinfo):
   return True # No more processing from command list
 
 def cmd_reward(match, entry, userinfo):
-  targetname = match.group(1)
-  if permissions.is_allowed(userinfo, { "minimum_standing": 1 }, "Trying to reward " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
     rewards.reward(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": 1
@@ -303,16 +325,22 @@ def cmd_reward(match, entry, userinfo):
 
 cmd_rlist = cmd_rlist + [
   {
-    "regex": "^reward ([^ ]+) ([^ ]+) (.*)$",
+    "regex": "^reward ([^ ]+) ([0-9.]+) (.*)$",
     "handler": cmd_reward_withvalueandreason,
+    "reason": "Trying to reward a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
-    "regex": "^reward ([^ ]+) (.*)$",
+    "regex": "^reward ([^ ]+) ([0-9.]+)$",
     "handler": cmd_reward_withvalue,
+    "reason": "Trying to reward a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^reward (.*)$",
     "handler": cmd_reward,
+    "reason": "Trying to reward a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^reward$",
@@ -330,10 +358,10 @@ Reward a player.
 ####### punish command #######
 
 def cmd_punish_withvalueandreason(match, entry, userinfo):
-  targetname = match.group(1)
-  level = int(match.group(2))
-  reason = match.group(3)
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
+    level = int(match.group(2))
+    reason = match.group(3)
     rewards.punish(users.getuser_byname(targetname), {
       "reason": reason,
       "level": level
@@ -341,9 +369,9 @@ def cmd_punish_withvalueandreason(match, entry, userinfo):
   return True # No more processing from command list
 
 def cmd_punish_withvalue(match, entry, userinfo):
-  targetname = match.group(1)
-  level = int(match.group(2))
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
+    level = int(match.group(2))
     rewards.punish(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": level
@@ -351,8 +379,8 @@ def cmd_punish_withvalue(match, entry, userinfo):
   return True # No more processing from command list
 
 def cmd_punish(match, entry, userinfo):
-  targetname = match.group(1)
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to punish " + targetname):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = match.group(1)
     rewards.punish(users.getuser_byname(targetname), {
       "reason": "Unspecified reason",
       "level": 1
@@ -361,16 +389,22 @@ def cmd_punish(match, entry, userinfo):
 
 cmd_rlist = cmd_rlist + [
   {
-    "regex": "^punish ([^ ]+) ([^ ]+) (.*)$",
+    "regex": "^punish ([^ ]+) ([0-9.]+) (.*)$",
     "handler": cmd_punish_withvalueandreason,
+    "reason": "Trying to punish a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
-    "regex": "^punish ([^ ]+) (.*)$",
+    "regex": "^punish ([^ ]+) ([0-9.]+)$",
     "handler": cmd_punish_withvalue,
+    "reason": "Trying to punish a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^punish (.*)$",
     "handler": cmd_punish,
+    "reason": "Trying to punish a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^punish$",
@@ -387,23 +421,31 @@ Punish a player.
 
 ####### standing command #######
 
-def cmd_standing(match, entry, userinfo):
-  if len(match.groups()) == 0:
-    targetname = userinfo["username"]
-  else:
+def cmd_standing_foruser(match, entry, userinfo):
+  if permissions.check_cmd(userinfo, entry):
     targetname = match.group(1)
 
-  users.message(userinfo, "User " + targetname + " has standing " + str(users.getuserstanding_byname(targetname)) + "\r\n")
+    users.message(userinfo, "User " + targetname + " has standing " + str(users.getuserstanding_byname(targetname)) + "\r\n")
+  return True # No more processing from command list
+
+def cmd_standing(match, entry, userinfo):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = userinfo["username"]
+
+    users.message(userinfo, "User " + targetname + " has standing " + str(users.getuserstanding_byname(targetname)) + "\r\n")
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^standing (.*)$",
-    "handler": cmd_standing,
+    "handler": cmd_standing_foruser,
+    "reason": "Trying to check player's standing",
+    "default_permissions": { "minimum_standing": 1000 }
   },
   {
     "regex": "^standing$",
     "handler": cmd_standing,
+    "reason": "Trying to check own standing",
   },
 ]
 
@@ -418,13 +460,15 @@ Respond with the current standing of yourself or a given player.
 ####### save command #######
 
 def cmd_save(match, entry, userinfo):
-  saveconfig()
+  if permissions.check_cmd(userinfo, entry):
+    saveconfig()
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^save$",
     "handler": cmd_save,
+    "reason": "Trying to save server data",
   },
   {
     "regex": "^save ",
@@ -442,7 +486,7 @@ Save the current script state.
 ####### server command #######
 
 def cmd_server(match, entry, userinfo):
-  if "admin" in userinfo and userinfo["admin"]:
+  if permissions.check_cmd(userinfo, entry):
     cmd = match.group(1)
     externals.minecraft.send(cmd + "\r\n")
   return True # No more processing from command list
@@ -451,6 +495,8 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^server (.*)$",
     "handler": cmd_server,
+    "reason": "Trying to run a command on the Minecraft server",
+    "default_permissions": { "allowed": False }
   },
   {
     "regex": "^server$",
@@ -468,7 +514,7 @@ help_map["server"] = {
 ####### title command #######
 
 def cmd_announcement(match, entry, userinfo):
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to make a title"):
+  if permissions.check_cmd(userinfo, entry):
     msg = match.group(1)
     externals.minecraft.announcement(msg)
   return True # No more processing from command list
@@ -477,6 +523,8 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^announcement (.*)$",
     "handler": cmd_announcement,
+    "reason": "Trying to make an announcement",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^announcement$",
@@ -494,7 +542,7 @@ Show a title (and possible subtitle) to all players.
 ####### say command #######
 
 def cmd_say(match, entry, userinfo):
-  if permissions.is_allowed(userinfo, { "minimum_standing": 0 }, "Trying to make the server speak"):
+  if permissions.check_cmd(userinfo, entry):
     msg = match.group(1)
     externals.minecraft.say(msg)
   return True # No more processing from command list
@@ -503,6 +551,8 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^say (.*)$",
     "handler": cmd_say,
+    "reason": "Trying to make the server speak",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^say$",
@@ -524,7 +574,7 @@ def cmd_twitch_say(match, entry, userinfo):
     users.message(userinfo, "Twitch integration is disabled.")
     return
 
-  if "admin" in userinfo and userinfo["admin"]:
+  if permissions.check_cmd(userinfo, entry):
     msg = match.group(1)
     externals.twitch.send("say EggSquishIt " + msg + "\n")
   return True # No more processing from command list
@@ -533,6 +583,8 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^twitch_say (.*)$",
     "handler": cmd_twitch_say,
+    "reason": "Trying to make the twitch bot speak",
+    "default_permissions": { "allowed": False }
   },
   {
     "regex": "^twitch_say$",
@@ -549,14 +601,16 @@ Have the twitch bot speak.
 
 ####### gs command #######
 
-def cmd_gs(match, entry, userinfo):
-  print("Got " + str(len(match.groups())) + " groups.")
-  if len(match.groups()) == 0:
-    targetname = userinfo["username"]
-  else:
+def cmd_gs_forplayer(match, entry, userinfo):
+  if permissions.check_cmd(userinfo, entry):
     targetname = match.group(1)
+    externals.minecraft.send("give " + targetname + " glowstone\r\n")
 
-  if permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give glowstone to " + targetname):
+  return True # No more processing from command list
+
+def cmd_gs(match, entry, userinfo):
+  if permissions.check_cmd(userinfo, entry):
+    targetname = userinfo["username"]
     externals.minecraft.send("give " + targetname + " glowstone\r\n")
 
   return True # No more processing from command list
@@ -565,10 +619,14 @@ cmd_rlist = cmd_rlist + [
   {
     "regex": "^gs$",
     "handler": cmd_gs,
+    "reason": "Trying to give glowstone to self",
+    "default_permissions": { "minimum_standing": 1000 }
   },
   {
     "regex": "^gs (.*)$",
-    "handler": cmd_gs,
+    "handler": cmd_gs_forplayer,
+    "reason": "Trying to give glowstone to player",
+    "default_permissions": { "minimum_standing": 1000 }
   },
 ]
 
@@ -583,19 +641,18 @@ Gives glowstone to you or another player.
 ####### give command #######
 
 def cmd_give(match, entry, userinfo):
-  who = match.group(1)
-  what = match.group(2)
-
-  if not permissions.is_allowed(userinfo, { "minimum_standing": 100 }, "Trying to give " + what + " to " + who):
-    return True # No more processing from command list
-
-  externals.minecraft.send("give " + who + " " + what + "\r\n")
+  if permissions.check_cmd(userinfo, entry):
+    who = match.group(1)
+    what = match.group(2)
+    externals.minecraft.send("give " + who + " " + what + "\r\n")
   return True # No more processing from command list
 
 cmd_rlist = cmd_rlist + [
   {
     "regex": "^give ([^ ]+) (.*)$",
     "handler": cmd_give,
+    "reason": "Trying to give an item to a player",
+    "default_permissions": { "minimum_standing": 10000 }
   },
   {
     "regex": "^give($| )",
