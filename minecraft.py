@@ -2,31 +2,31 @@ import simpleprocess
 import externals
 
 mobs = [
-  {
-    "description": "a cow",
-    "id": "minecraft:cow",
-    "level": 20
-  },
-  {
-    "description": "a creeper",
-    "id": "minecraft:creeper",
-    "level": -30
-  },
-  {
-    "description": "a bat",
-    "id": "minecraft:bat",
-    "level": -1
-  },
-  {
-    "description": "a zombie",
-    "id": "minecraft:zombie",
-    "level": -10
-  },
-  {
-    "description": "a skeleton",
-    "id": "minecraft:skeleton",
-    "level": -40
-  }
+	{
+		"description": "a cow",
+		"id": "minecraft:cow",
+		"level": 20
+	},
+	{
+		"description": "a creeper",
+		"id": "minecraft:creeper",
+		"level": -30
+	},
+	{
+		"description": "a bat",
+		"id": "minecraft:bat",
+		"level": -1
+	},
+	{
+		"description": "a zombie",
+		"id": "minecraft:zombie",
+		"level": -10
+	},
+	{
+		"description": "a skeleton",
+		"id": "minecraft:skeleton",
+		"level": -40
+	}
 ]
 
 class Server(simpleprocess.SimpleProcess):
